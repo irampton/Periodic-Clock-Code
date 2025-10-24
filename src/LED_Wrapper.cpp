@@ -24,6 +24,13 @@ void LED_Wrapper::setLED(int index, CRGB color) {
 	}
 }
 
+void LED_Wrapper::preSetLED(int index, CRGB color) {
+	if (index >= 0 && index < numLEDs)
+	{ // Ensure the index is valid (0-based index)
+		leds[index] = color; // Set the color of the LED at the given index
+	}
+}
+
 void LED_Wrapper::setColors(CRGB* colors, int numLEDs) {
 	if (numLEDs == this->numLEDs)
 	{ // Ensure the array size matches the number of LEDs
@@ -33,4 +40,8 @@ void LED_Wrapper::setColors(CRGB* colors, int numLEDs) {
 		}
 		FastLED.show(); // Update the LED strip
 	}
+}
+
+void LED_Wrapper::renderLEDs() {
+	FastLED.show();
 }

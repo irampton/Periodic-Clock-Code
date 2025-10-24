@@ -2,8 +2,7 @@
 #include <Wire.h>
 
 #include "DS3231_Wrapper.h"
-#include "LED_Wrapper.h"
-#include "font.h"
+#include "Display.h"
 
 // ---------- Setup / Loop ----------
 void setup() {
