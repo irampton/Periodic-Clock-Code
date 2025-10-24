@@ -3,6 +3,7 @@
 
 #include "DS3231_Wrapper.h"
 #include "LED_Wrapper.h"
+#include "font.h"
 
 // ---------- Setup / Loop ----------
 void setup() {
