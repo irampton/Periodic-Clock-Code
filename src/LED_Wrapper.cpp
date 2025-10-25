@@ -32,14 +32,31 @@ void LED_Wrapper::preSetLED(int index, CRGB color) {
 }
 
 void LED_Wrapper::setColors(CRGB* colors, int numLEDs) {
-	if (numLEDs == this->numLEDs)
-	{ // Ensure the array size matches the number of LEDs
-		for (int i = 0; i < numLEDs; i++)
-		{
-			leds[i] = colors[i]; // Set each LED's color
-		}
-		FastLED.show(); // Update the LED strip
+	for (int i = 0; i < numLEDs && i < this->numLEDs; i++)
+	{
+		leds[i] = colors[i]; // Set each LED's color
 	}
+	FastLED.show(); // Update the LED strip
+}
+
+void LED_Wrapper::setBrightness(uint8_t brightness, bool update) {
+	FastLED.setBrightness(brightness);
+	if (update) {
+		FastLED.show();
+	}
+}
+
+void LED_Wrapper::fillEvenRainbow(uint8_t startHue) {
+	uint8_t delta = 0;
+	if (numLEDs > 1) {
+		const uint16_t divisor = static_cast<uint16_t>(numLEDs - 1);
+		uint8_t step = static_cast<uint8_t>(255 / divisor);
+		if (step == 0) {
+			step = 1;
+		}
+		delta = step;
+	}
+	fill_rainbow(leds, numLEDs, startHue, delta);
 }
 
 void LED_Wrapper::renderLEDs() {

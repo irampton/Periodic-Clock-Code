@@ -12,6 +12,8 @@ public:
 	void setLED(int index, CRGB color); // Set a specific LED based on its index (0-based index)
 	void preSetLED(int index, CRGB color); // Set a specific LED based on its index without showing it
 	void setColors(CRGB* colors, int numLEDs); // Set the colors of multiple LEDs based on an array
+	void fillEvenRainbow(uint8_t startHue = 0);
+	void setBrightness(uint8_t brightness, bool update = true);
 	void renderLEDs(); // Shows the LEDs
 
 private:

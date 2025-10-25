@@ -12,7 +12,6 @@ struct Glyph {
 
 struct FontMeta {
   uint8_t  height;      // 7
-  uint8_t  colStride;   // 1
   uint16_t glyphCount;
 };
 
@@ -38,7 +37,7 @@ inline const Glyph* font_lookup_ascii(char c){
   return font_lookup_u16(idx);
 }
 inline const uint8_t* font_column_bytes(const Glyph& g, int x){
-  return &kFontBitmap[g.offset + x * kFontMeta.colStride];
+  return &kFontBitmap[g.offset + x];
 }
 inline uint8_t font_column_byte(const Glyph& g, int x){
   return kFontBitmap[g.offset + x];
