@@ -10,6 +10,8 @@
 #define COLUMNS 7
 #define LED_PIN 15
 
+#define BUZZER_PIN 13
+
 Rotary* r1 = new Rotary(9, 10, 8);
 DS3231_Wrapper myRTC;
 Display* display = new Display(ROWS, COLUMNS, LED_PIN);
@@ -20,6 +22,8 @@ void setup() {
     Wire.begin();
 
     InputEventBuffer::init();
+
+    pinMode(BUZZER_PIN, OUTPUT);
 
     Serial.begin(9600);
 }
@@ -32,12 +36,15 @@ void loop() {
     while (InputEventBuffer::pop(event)) {
         switch (event.type) {
         case InputEventType::RotaryCW:
+            analogWrite(BUZZER_PIN, 10);
             Serial.println("RotaryCW");
             break;
         case InputEventType::RotaryCCW:
+            analogWrite(BUZZER_PIN, 80);
             Serial.println("RotaryCCW");
             break;
         case InputEventType::RotaryButton:
+            analogWrite(BUZZER_PIN, 0);
             Serial.println("RotaryButton");
             break;
         case InputEventType::AuxButton0:
