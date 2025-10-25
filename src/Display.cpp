@@ -5,8 +5,13 @@
 #include <vector>
 
 Display::Display(int rows, int cols, int led_pin)
-    : height(cols), width(rows), driver(led_pin, rows * cols) {
+    : height(rows), width(cols), driver(led_pin, rows * cols) {
+}
+
+void Display::init() {
     driver.init();
+    driver.setBrightness(16);
+    driver.clearAll();
 }
 
 void Display::write_string(char text[], CRGB* colors) {
@@ -71,14 +76,19 @@ void Display::write_string(char text[], CRGB* colors) {
             columns.push_back(columnByte);
             columnColors.push_back(glyphColor);
         }
+        if( columns.size() < width) {
+            columns.push_back(0x00);
+            columnColors.push_back(glyphColor);
+        }
     }
 
     const int columnCount = std::min(columns.size(), static_cast<size_t>(width));
     const int totalSize = columnCount * height;
 
+
     for (int col = 0; col < columnCount; ++col) {
         const uint8_t columnBits = columns[col];
-        const bool reverse = (col % 2 == 1);
+        const bool reverse = ( (width - col) % 9) % 2 == 0;
         int colStart = totalSize - 1 - col * height;
         for (int row = 0; row < height; ++row) {
             const bool pixelOn = columnBits & (0b1 << row);

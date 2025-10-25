@@ -6,8 +6,8 @@
 #include "InputEventBuffer.h"
 #include "Display.h"
 
-#define ROWS 9
-#define COLUMNS 7
+#define ROWS 7
+#define COLUMNS 27
 #define LED_PIN 15
 
 #define BUZZER_PIN 13
@@ -21,6 +21,7 @@ void setup() {
     Wire.setSCL(1);
     Wire.begin();
 
+    display->init();
     InputEventBuffer::init();
 
     pinMode(BUZZER_PIN, OUTPUT);
@@ -36,45 +37,36 @@ void loop() {
     while (InputEventBuffer::pop(event)) {
         switch (event.type) {
         case InputEventType::RotaryCW:
-            analogWrite(BUZZER_PIN, 10);
+            analogWrite(BUZZER_PIN, 0);
             Serial.println("RotaryCW");
             break;
         case InputEventType::RotaryCCW:
-            analogWrite(BUZZER_PIN, 80);
+            analogWrite(BUZZER_PIN, 50);
             Serial.println("RotaryCCW");
             break;
         case InputEventType::RotaryButton:
-            analogWrite(BUZZER_PIN, 0);
             Serial.println("RotaryButton");
             break;
         case InputEventType::AuxButton0:
             myRTC.printTime();
             break;
         case InputEventType::AuxButton1:
-            string[0] = 'a';
-            string[1] = 'b';
-            colors[0] = CRGB::Orange;
-            colors[1] = colors[2] = colors[3] = colors[4] = CRGB::Green4;
-            display->write_string(string, colors);
             Serial.println("AuxButton1");
             break;
         case InputEventType::AuxButton2:
-            string[0] = 'Z';
-            string[1] = 'A';
-            colors[0] = CRGB::Red3;
-            colors[1] = colors[2] = colors[3] = colors[4] = CRGB::Blue2;
-            display->write_string(string, colors);
             Serial.println("AuxButton2");
             break;
         case InputEventType::AuxButton3:
-            string[0] = 'Z';
-            string[1] = 0;
-            colors[0] = CRGB::Red3;
-            colors[1] = colors[2] = colors[3] = colors[4] = CRGB::Blue2;
-            display->write_string(string, colors);
             Serial.println("AuxButton3");
             break;
         case InputEventType::AuxButton4:
+            string[0] = '1';
+            string[1] = '2';
+            string[2] = ':';
+            string[3] = '0';
+            string[4] = '0';
+            colors[0] = colors[1] = colors[2] = colors[3] = colors[4] = CRGB::Blue2;
+            display->write_string(string, colors);
             Serial.println("AuxButton4");
             break;
         }
