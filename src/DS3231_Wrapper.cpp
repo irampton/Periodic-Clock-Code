@@ -33,3 +33,24 @@ int DS3231_Wrapper::getMinutes() {
 int DS3231_Wrapper::getSeconds() {
 	return DS3231_Wrapper::rtc.getSecond(); // Return the second
 }
+
+void DS3231_Wrapper::setHours(uint8_t hour) {
+	if (hour > 23) {
+		return;
+	}
+	rtc.setHour(hour);
+}
+
+void DS3231_Wrapper::setMinutes(uint8_t minute) {
+	if (minute > 59) {
+		return;
+	}
+	rtc.setMinute(minute);
+}
+
+void DS3231_Wrapper::setSeconds(uint8_t second) {
+	if (second > 59) {
+		return;
+	}
+	rtc.setSecond(second);
+}
