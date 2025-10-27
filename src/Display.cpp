@@ -4,13 +4,16 @@
 #include <cstring>
 #include <vector>
 
+#define BRIGHTNESS_STEP 16
+#define INITIAL_BRIGHTNESS 64
+
 Display::Display(int rows, int cols, int led_pin)
-    : height(rows), width(cols), driver(led_pin, rows * cols) {
+    : height(rows), width(cols), brightness(INITIAL_BRIGHTNESS), driver(led_pin, rows * cols) {
 }
 
 void Display::init() {
     driver.init();
-    driver.setBrightness(16);
+    driver.setBrightness(brightness);
     driver.clearAll();
 }
 
@@ -76,7 +79,7 @@ void Display::write_string(char text[], CRGB* colors) {
             columns.push_back(columnByte);
             columnColors.push_back(glyphColor);
         }
-        if( columns.size() < width) {
+        if (columns.size() < width) {
             columns.push_back(0x00);
             columnColors.push_back(glyphColor);
         }
@@ -88,7 +91,7 @@ void Display::write_string(char text[], CRGB* colors) {
 
     for (int col = 0; col < columnCount; ++col) {
         const uint8_t columnBits = columns[col];
-        const bool reverse = ( (width - 1 - col) % 9) % 2 == 1;
+        const bool reverse = ((width - 1 - col) % 9) % 2 == 1;
         int colStart = totalSize - 1 - col * height;
         for (int row = 0; row < height; ++row) {
             const bool pixelOn = columnBits & (0b1 << row);
@@ -97,4 +100,16 @@ void Display::write_string(char text[], CRGB* colors) {
         }
     }
     driver.renderLEDs();
+}
+
+void Display::incrementBrightness() {
+    const uint16_t updated = static_cast<uint16_t>(brightness) + BRIGHTNESS_STEP;
+    brightness = static_cast<uint8_t>(std::min<uint16_t>(updated, 255));
+    driver.setBrightness(brightness);
+}
+
+void Display::decrementBrightness() {
+    const int updated = static_cast<int>(brightness) - BRIGHTNESS_STEP;
+    brightness = static_cast<uint8_t>(std::max(updated, 0));
+    driver.setBrightness(brightness);
 }

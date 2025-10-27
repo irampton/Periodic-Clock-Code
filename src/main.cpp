@@ -140,11 +140,11 @@ void loop() {
     while (InputEventBuffer::pop(event)) {
         switch (event.type) {
         case InputEventType::RotaryCW:
-            analogWrite(BUZZER_PIN, 0);
+            display->incrementBrightness();
             Serial.println("RotaryCW");
             break;
         case InputEventType::RotaryCCW:
-            analogWrite(BUZZER_PIN, 50);
+            display->decrementBrightness();
             Serial.println("RotaryCCW");
             break;
         case InputEventType::RotaryButton:
@@ -186,7 +186,6 @@ void loop() {
 constexpr uint8_t kButtonPins[] = {2, 3, 4, 5, 6};
 constexpr size_t kButtonCount = sizeof(kButtonPins) / sizeof(kButtonPins[0]);
 constexpr uint8_t kDebounceLimit = 3;
-constexpr int kBrightnessStep = 16;
 
 void setup1() {
     r1->init();
