@@ -88,7 +88,7 @@ void Display::write_string(char text[], CRGB* colors) {
 
     for (int col = 0; col < columnCount; ++col) {
         const uint8_t columnBits = columns[col];
-        const bool reverse = ( (width - col) % 9) % 2 == 0;
+        const bool reverse = ( (width - 1 - col) % 9) % 2 == 1;
         int colStart = totalSize - 1 - col * height;
         for (int row = 0; row < height; ++row) {
             const bool pixelOn = columnBits & (0b1 << row);
