@@ -1,10 +1,12 @@
 #include <Arduino.h>
 #include <Wire.h>
+#include <cstdio>
 
 #include "Rotary.h"
 #include "DS3231_Wrapper.h"
 #include "InputEventBuffer.h"
 #include "Display.h"
+#include "Periodic_Conversion.h"
 
 #define ROWS 7
 #define COLUMNS 27
@@ -15,6 +17,14 @@
 Rotary* r1 = new Rotary(9, 10, 8);
 DS3231_Wrapper myRTC;
 Display* display = new Display(ROWS, COLUMNS, LED_PIN);
+
+enum class ClockMode {
+    Hour12,
+    Hour24,
+    Periodic,
+};
+
+ClockMode clock_mode = ClockMode::Periodic;
 
 bool isUnsignedInteger(const String& value) {
     if (value.length() == 0) {
@@ -107,21 +117,43 @@ void setup() {
     Serial.begin(9600);
 }
 
-char string[5];
+std::string text;
 CRGB colors[5];
 
 void loop() {
     const int hours = myRTC.getHours();
     const int minutes = myRTC.getMinutes();
 
-    string[0] = '0' + (hours / 10);
-    string[1] = '0' + (hours % 10);
-    string[2] = ':';
-    string[3] = '0' + (minutes / 10);
-    string[4] = '0' + (minutes % 10);
-
-    colors[0] = colors[1] = colors[2] = colors[3] = colors[4] = CRGB::Blue2;
-    display->write_string(string, colors);
+    switch (clock_mode) {
+    case ClockMode::Hour12: {
+        char buffer[6];
+        int hour12 = hours % 12;
+        if (hour12 == 0) {
+            hour12 = 12;
+        }
+        std::snprintf(buffer, sizeof(buffer), "%2d:%02d", hour12, minutes);
+        text.assign(buffer);
+        for (CRGB& color : colors) {
+            color = CRGB::Blue2;
+        }
+        display->write_string(text, colors);
+        break;
+    }
+    case ClockMode::Hour24: {
+        char buffer[6];
+        std::snprintf(buffer, sizeof(buffer), "%02d:%02d", hours, minutes);
+        text.assign(buffer);
+        for (CRGB& color : colors) {
+            color = CRGB::Blue2;
+        }
+        display->write_string(text, colors);
+        break;
+    }
+    case ClockMode::Periodic:
+        convert_to_periodic_time(hours, minutes, text, colors);
+        display->write_string(text, colors);
+        break;
+    }
 
     static String serialBuffer;
     while (Serial.available() > 0) {
@@ -151,7 +183,20 @@ void loop() {
             Serial.println("RotaryButton");
             break;
         case InputEventType::AuxButton0:
-            myRTC.printTime();
+            switch (clock_mode) {
+            case ClockMode::Periodic:
+                clock_mode = ClockMode::Hour12;
+                Serial.println("Clock mode: 12-hour");
+                break;
+            case ClockMode::Hour12:
+                clock_mode = ClockMode::Hour24;
+                Serial.println("Clock mode: 24-hour");
+                break;
+            case ClockMode::Hour24:
+                clock_mode = ClockMode::Periodic;
+                Serial.println("Clock mode: periodic");
+                break;
+            }
             break;
         case InputEventType::AuxButton1:
             Serial.println("AuxButton1");
@@ -163,13 +208,6 @@ void loop() {
             Serial.println("AuxButton3");
             break;
         case InputEventType::AuxButton4:
-            string[0] = '1';
-            string[1] = '2';
-            string[2] = ':';
-            string[3] = '0';
-            string[4] = '0';
-            colors[0] = colors[1] = colors[2] = colors[3] = colors[4] = CRGB::Blue2;
-            display->write_string(string, colors);
             Serial.println("AuxButton4");
             break;
         }

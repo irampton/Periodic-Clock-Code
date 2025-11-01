@@ -1,5 +1,4 @@
-#ifndef LED_WRAPPER_H
-#define LED_WRAPPER_H
+#pragma once
 
 #include <FastLED.h>
 
@@ -21,5 +20,3 @@ private:
 	int numLEDs; // Number of LEDs in the strip
 	CRGB* leds; // Array to hold LED colors
 };
-
-#endif

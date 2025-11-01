@@ -1,9 +1,5 @@
 #include "Display.h"
 
-#include <algorithm>
-#include <cstring>
-#include <vector>
-
 #define BRIGHTNESS_STEP 16
 #define INITIAL_BRIGHTNESS 64
 
@@ -100,6 +96,12 @@ void Display::write_string(char text[], CRGB* colors) {
         }
     }
     driver.renderLEDs();
+}
+
+void Display::write_string(const std::string& text, CRGB* colors) {
+    // const_cast is fine here because your other function expects
+    // a mutable char array, but we’re not modifying it.
+    write_string(const_cast<char*>(text.c_str()), colors);
 }
 
 void Display::incrementBrightness() {
