@@ -121,40 +121,6 @@ std::string text;
 CRGB colors[5];
 
 void loop() {
-    const int hours = myRTC.getHours();
-    const int minutes = myRTC.getMinutes();
-
-    switch (clock_mode) {
-    case ClockMode::Hour12: {
-        char buffer[6];
-        int hour12 = hours % 12;
-        if (hour12 == 0) {
-            hour12 = 12;
-        }
-        std::snprintf(buffer, sizeof(buffer), "%2d:%02d", hour12, minutes);
-        text.assign(buffer);
-        for (CRGB& color : colors) {
-            color = CRGB::Blue2;
-        }
-        display->write_string(text, colors);
-        break;
-    }
-    case ClockMode::Hour24: {
-        char buffer[6];
-        std::snprintf(buffer, sizeof(buffer), "%02d:%02d", hours, minutes);
-        text.assign(buffer);
-        for (CRGB& color : colors) {
-            color = CRGB::Blue2;
-        }
-        display->write_string(text, colors);
-        break;
-    }
-    case ClockMode::Periodic:
-        convert_to_periodic_time(hours, minutes, text, colors);
-        display->write_string(text, colors);
-        break;
-    }
-
     static String serialBuffer;
     while (Serial.available() > 0) {
         const char incoming = static_cast<char>(Serial.read());
@@ -217,7 +183,56 @@ void loop() {
         Serial.println("Input queue overflow");
     }
 
-    delay(1);
+    const int hours = myRTC.getHours();
+    const int minutes = myRTC.getMinutes();
+
+    static bool displayInitialised = false;
+    static int displayedHours = -1;
+    static int displayedMinutes = -1;
+    static ClockMode displayedMode = ClockMode::Periodic;
+
+    const bool timeChanged = (hours != displayedHours) || (minutes != displayedMinutes);
+    const bool modeChanged = (clock_mode != displayedMode);
+
+    if (!displayInitialised || timeChanged || modeChanged) {
+        switch (clock_mode) {
+        case ClockMode::Hour12: {
+            char buffer[6];
+            int hour12 = hours % 12;
+            if (hour12 == 0) {
+                hour12 = 12;
+            }
+            std::snprintf(buffer, sizeof(buffer), "%2d:%02d", hour12, minutes);
+            text.assign(buffer);
+            for (CRGB& color : colors) {
+                color = CRGB::Blue2;
+            }
+            break;
+        }
+        case ClockMode::Hour24: {
+            char buffer[6];
+            std::snprintf(buffer, sizeof(buffer), "%02d:%02d", hours, minutes);
+            text.assign(buffer);
+            for (CRGB& color : colors) {
+                color = CRGB::Blue2;
+            }
+            break;
+        }
+        case ClockMode::Periodic:
+            convert_to_periodic_time(hours, minutes, text, colors);
+            break;
+        }
+
+        display->write_string(text, colors, true);
+        displayedHours = hours;
+        displayedMinutes = minutes;
+        displayedMode = clock_mode;
+        displayInitialised = true;
+    }
+
+	// Update the display @ up to 60 frames per second
+	display->tick();
+    delay(16);
 }
 
 // Button Inputs
