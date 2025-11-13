@@ -1,37 +1,66 @@
 const Serial = require('./serial');
 
-function sendHelloWorld() {
-    Serial.scan(async ports => {
+function sleep(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+function sendToAllPorts() {
+    Serial.scan(async (ports) => {
         if (!Array.isArray(ports) || ports.length === 0) {
+            console.error('No serial ports found.');
             return;
         }
 
+        // We got the list; no need to keep scanning.
         Serial.stopScan();
 
-        const [x, firstPort] = ports;
+        for (const port of ports) {
+            if (!port || !port.path) {
+                console.warn('Skipping port with no path:', port);
+                continue;
+            }
 
-        if (!firstPort || !firstPort.path) {
-            console.error('First serial port has no path; aborting connection attempt.');
-            return;
-        }
+            console.log(`\n=== Trying port: ${port.path} ===`);
 
-        try {
-            await Serial.connect(firstPort.path);
-            console.log(`Connected to ${firstPort.path}`);
-            console.log(new Date().getHours());
-            Serial.send(`set hour ${new Date().getHours()}`);
-            console.log(new Date().getMinutes());
-            Serial.send(`set min ${new Date().getMinutes()}`);
-            console.log(new Date().getSeconds());
-            Serial.send(`set sec ${new Date().getSeconds()}`);
-            Serial.send('hello world');
-            setTimeout(()=>{
+            try {
+                await Serial.connect(port.path);
+                console.log(`Connected to ${port.path}`);
+
+                const now = new Date();
+                const hour = now.getHours();
+                const min  = now.getMinutes();
+                const sec  = now.getSeconds();
+
+                console.log(hour);
+                Serial.send(`set hour ${hour}`);
+
+                console.log(min);
+                Serial.send(`set min ${min}`);
+
+                console.log(sec);
+                Serial.send(`set sec ${sec}`);
+
+                Serial.send('hello world');
+
+                // Give it some time to transmit / process if needed
+                await sleep(1000);
+
                 Serial.disconnect();
-            }, 10000);
-        } catch (error) {
-            console.error(`Failed to connect to serial port ${firstPort.path}:`, error);
+                console.log(`Disconnected from ${port.path}`);
+            } catch (error) {
+                console.error(`Failed on serial port ${port.path}:`, error);
+                // Move on to the next port, no rethrow
+                try {
+                    // Just in case a partial connection happened
+                    Serial.disconnect();
+                } catch (_) {
+                    // ignore disconnect errors
+                }
+            }
         }
+
+        console.log('\nDone processing all serial ports.');
     });
 }
 
-sendHelloWorld();
+sendToAllPorts();

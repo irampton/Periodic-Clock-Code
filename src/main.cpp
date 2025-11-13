@@ -160,8 +160,8 @@ void loop() {
 constexpr uint8_t kButtonPins[] = {2, 3, 4, 5, 6};
 constexpr size_t kButtonCount = sizeof(kButtonPins) / sizeof(kButtonPins[0]);
 constexpr uint8_t kDebounceLimit = 3;
-constexpr uint32_t kDoubleClickThresholdMs = 400;
-constexpr uint32_t kHoldThresholdMs = 1000;
+constexpr uint32_t kDoubleClickThresholdMs = 200;
+constexpr uint32_t kHoldThresholdMs = 800;
 
 struct ButtonState {
     bool isPressed = false;
