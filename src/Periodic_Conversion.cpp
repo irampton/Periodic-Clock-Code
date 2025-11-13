@@ -13,7 +13,7 @@
 // 09:   Actinoids
 // 10:   N/A
 
-const std::string pTable[118] = {"  ", 
+const std::string pTable[118] = {" ∅", 
 "H", "He", "Li", "Be", "B", "C", "N", "O", "F", "Ne",
 "Na", "Mg", "Al", "Si", "P", "S", "Cl", "Ar", "K", "Ca",
 "Sc", "Ti", "V", "Cr", "Mn", "Fe", "Co", "Ni", "Cu", "Zn",

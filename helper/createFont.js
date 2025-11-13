@@ -113,7 +113,7 @@ ${lut}
 
 ${bmp}
 `;
-    fs.writeFileSync(`${OUT_PREFIX}.cpp`, cpp, 'utf8');
+    fs.writeFileSync(`../src/${OUT_PREFIX}.cpp`, cpp, 'utf8');
 }
 
 try {
