@@ -11,14 +11,14 @@ void InputEventBuffer::init() {
     overflowed = false;
 }
 
-bool InputEventBuffer::push(InputEventType type, uint8_t value) {
+bool InputEventBuffer::push(InputKey key, InputEventType type, uint8_t value) {
     const uint8_t nextHead = static_cast<uint8_t>((head + 1U) % kCapacity);
     if (nextHead == tail) {
         overflowed = true;
         return false;
     }
 
-    buffer[head] = {type, value};
+    buffer[head] = {key, type, value};
     head = nextHead;
     return true;
 }

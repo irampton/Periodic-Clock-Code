@@ -21,6 +21,24 @@ Display* display = new Display(ROWS, COLUMNS, LED_PIN);
 
 ClockMode clock_mode = ClockMode::Periodic;
 
+const char* inputEventTypeToString(InputEventType type) {
+    switch (type) {
+    case InputEventType::Pressed:
+        return "Pressed";
+    case InputEventType::DoubleClick:
+        return "DoubleClick";
+    case InputEventType::Hold:
+        return "Hold";
+    }
+    return "Unknown";
+}
+
+void logButtonEvent(const char* label, InputEventType type) {
+    Serial.print(label);
+    Serial.print(" ");
+    Serial.println(inputEventTypeToString(type));
+}
+
 void setup() {
     Wire.setSDA(0);
     Wire.setSCL(1);
@@ -53,45 +71,53 @@ void loop() {
     // Go through any input that loop1() picked up
     InputEvent event{};
     while (InputEventBuffer::pop(event)) {
-        switch (event.type) {
-        case InputEventType::RotaryCW:
-            display->incrementBrightness();
-            Serial.println("RotaryCW");
-            break;
-        case InputEventType::RotaryCCW:
-            display->decrementBrightness();
-            Serial.println("RotaryCCW");
-            break;
-        case InputEventType::RotaryButton:
-            Serial.println("RotaryButton");
-            break;
-        case InputEventType::AuxButton0:
-            switch (clock_mode) {
-            case ClockMode::Periodic:
-                clock_mode = ClockMode::Hour12;
-                Serial.println("Clock mode: 12-hour");
-                break;
-            case ClockMode::Hour12:
-                clock_mode = ClockMode::Hour24;
-                Serial.println("Clock mode: 24-hour");
-                break;
-            case ClockMode::Hour24:
-                clock_mode = ClockMode::Periodic;
-                Serial.println("Clock mode: periodic");
-                break;
+        switch (event.key) {
+        case InputKey::RotaryCW:
+            if (event.type == InputEventType::Pressed) {
+                display->incrementBrightness();
+                Serial.println("RotaryCW");
             }
             break;
-        case InputEventType::AuxButton1:
-            Serial.println("AuxButton1");
+        case InputKey::RotaryCCW:
+            if (event.type == InputEventType::Pressed) {
+                display->decrementBrightness();
+                Serial.println("RotaryCCW");
+            }
             break;
-        case InputEventType::AuxButton2:
-            Serial.println("AuxButton2");
+        case InputKey::RotaryButton:
+            logButtonEvent("RotaryButton", event.type);
             break;
-        case InputEventType::AuxButton3:
-            Serial.println("AuxButton3");
+        case InputKey::AuxButton0:
+            if (event.type == InputEventType::Pressed) {
+                switch (clock_mode) {
+                case ClockMode::Periodic:
+                    clock_mode = ClockMode::Hour12;
+                    Serial.println("Clock mode: 12-hour");
+                    break;
+                case ClockMode::Hour12:
+                    clock_mode = ClockMode::Hour24;
+                    Serial.println("Clock mode: 24-hour");
+                    break;
+                case ClockMode::Hour24:
+                    clock_mode = ClockMode::Periodic;
+                    Serial.println("Clock mode: periodic");
+                    break;
+                }
+            } else {
+                logButtonEvent("AuxButton0", event.type);
+            }
             break;
-        case InputEventType::AuxButton4:
-            Serial.println("AuxButton4");
+        case InputKey::AuxButton1:
+            logButtonEvent("AuxButton1", event.type);
+            break;
+        case InputKey::AuxButton2:
+            logButtonEvent("AuxButton2", event.type);
+            break;
+        case InputKey::AuxButton3:
+            logButtonEvent("AuxButton3", event.type);
+            break;
+        case InputKey::AuxButton4:
+            logButtonEvent("AuxButton4", event.type);
             break;
         }
     }
@@ -134,6 +160,17 @@ void loop() {
 constexpr uint8_t kButtonPins[] = {2, 3, 4, 5, 6};
 constexpr size_t kButtonCount = sizeof(kButtonPins) / sizeof(kButtonPins[0]);
 constexpr uint8_t kDebounceLimit = 3;
+constexpr uint32_t kDoubleClickThresholdMs = 400;
+constexpr uint32_t kHoldThresholdMs = 1000;
+
+struct ButtonState {
+    bool isPressed = false;
+    uint8_t debounceCounter = 0;
+    uint32_t pressStartMs = 0;
+    bool holdEventSent = false;
+    bool pendingSingleClick = false;
+    uint32_t pendingSingleClickTime = 0;
+};
 
 void setup1() {
     r1->init();
@@ -144,49 +181,71 @@ void setup1() {
 
 // Polls for any button presses or rotary encoder movement
 void loop1() {
-    static bool initialised = false;
-    static bool buttonPressed[kButtonCount];
-    static uint8_t debounceCounters[kButtonCount];
-
-    if (!initialised) {
-        for (size_t i = 0; i < kButtonCount; ++i) {
-            buttonPressed[i] = false;
-            debounceCounters[i] = 0;
-        }
-        initialised = true;
-    }
+    static ButtonState buttonStates[kButtonCount];
 
     bool rotaryInput[3];
     r1->loop(rotaryInput);
 
     if (rotaryInput[0]) {
-        InputEventBuffer::push(InputEventType::RotaryCW);
+        InputEventBuffer::push(InputKey::RotaryCW, InputEventType::Pressed);
     }
     if (rotaryInput[1]) {
-        InputEventBuffer::push(InputEventType::RotaryCCW);
+        InputEventBuffer::push(InputKey::RotaryCCW, InputEventType::Pressed);
     }
     if (rotaryInput[2]) {
-        InputEventBuffer::push(InputEventType::RotaryButton);
+        InputEventBuffer::push(InputKey::RotaryButton, InputEventType::Pressed);
     }
 
     for (size_t i = 0; i < kButtonCount; ++i) {
+        auto& state = buttonStates[i];
         const uint8_t pin = kButtonPins[i];
-        const bool isPressed = digitalRead(pin) == LOW;
+        const bool isPressedNow = digitalRead(pin) == LOW;
+        const auto key = static_cast<InputKey>(
+            static_cast<uint8_t>(InputKey::AuxButton0) + static_cast<uint8_t>(i));
 
-        if (isPressed != buttonPressed[i]) {
-            debounceCounters[i]++;
-            if (debounceCounters[i] >= kDebounceLimit) {
-                buttonPressed[i] = isPressed;
-                debounceCounters[i] = 0;
+        if (isPressedNow != state.isPressed) {
+            state.debounceCounter++;
+            if (state.debounceCounter >= kDebounceLimit) {
+                state.isPressed = isPressedNow;
+                state.debounceCounter = 0;
 
-                if (isPressed) {
-                    const auto type = static_cast<InputEventType>(
-                        static_cast<uint8_t>(InputEventType::AuxButton0) + static_cast<uint8_t>(i));
-                    InputEventBuffer::push(type, pin);
+                if (isPressedNow) {
+                    state.pressStartMs = millis();
+                    state.holdEventSent = false;
+                } else {
+                    if (!state.holdEventSent) {
+                        const uint32_t releaseTime = millis();
+                        if (state.pendingSingleClick &&
+                            (releaseTime - state.pendingSingleClickTime) <= kDoubleClickThresholdMs) {
+                            InputEventBuffer::push(key, InputEventType::DoubleClick, pin);
+                            state.pendingSingleClick = false;
+                        } else {
+                            state.pendingSingleClick = true;
+                            state.pendingSingleClickTime = releaseTime;
+                        }
+                    }
+                    state.holdEventSent = false;
                 }
             }
         } else {
-            debounceCounters[i] = 0;
+            state.debounceCounter = 0;
+        }
+
+        if (state.isPressed && !state.holdEventSent) {
+            const uint32_t heldDuration = millis() - state.pressStartMs;
+            if (heldDuration >= kHoldThresholdMs) {
+                InputEventBuffer::push(key, InputEventType::Hold, pin);
+                state.holdEventSent = true;
+                state.pendingSingleClick = false;
+            }
+        }
+
+        if (!state.isPressed && state.pendingSingleClick) {
+            const uint32_t elapsed = millis() - state.pendingSingleClickTime;
+            if (elapsed > kDoubleClickThresholdMs) {
+                InputEventBuffer::push(key, InputEventType::Pressed, pin);
+                state.pendingSingleClick = false;
+            }
         }
     }
 

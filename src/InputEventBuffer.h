@@ -3,7 +3,7 @@
 
 #include <Arduino.h>
 
-enum class InputEventType : uint8_t {
+enum class InputKey : uint8_t {
     RotaryCW,
     RotaryCCW,
     RotaryButton,
@@ -14,7 +14,14 @@ enum class InputEventType : uint8_t {
     AuxButton4
 };
 
+enum class InputEventType : uint8_t {
+    Pressed,
+    DoubleClick,
+    Hold
+};
+
 struct InputEvent {
+    InputKey key;
     InputEventType type;
     uint8_t value;
 };
@@ -22,7 +29,7 @@ struct InputEvent {
 class InputEventBuffer {
 public:
     static void init();
-    static bool push(InputEventType type, uint8_t value = 0);
+    static bool push(InputKey key, InputEventType type, uint8_t value = 0);
     static bool pop(InputEvent& event);
     static bool isEmpty();
     static bool consumeOverflowFlag();
