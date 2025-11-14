@@ -97,35 +97,55 @@ void loop() {
 				logButtonEvent("RotaryButton", event.type);
 				break;
 			case InputKey::AuxButton0:
-				if (event.type == InputEventType::Pressed) {
-					switch (number_display_mode) {
-						case NumberDisplayMode::Periodic:
-							number_display_mode = NumberDisplayMode::Hour12;
-							Serial.println("Clock mode: 12-hour");
-							break;
-						case NumberDisplayMode::Hour12:
-							number_display_mode = NumberDisplayMode::Hour24;
-							Serial.println("Clock mode: 24-hour");
-							break;
-						case NumberDisplayMode::Hour24:
-							number_display_mode = NumberDisplayMode::Periodic;
-							Serial.println("Clock mode: periodic");
-							break;
-					}
+				if (current_mode != CurrentMode::clock) {
+					current_mode = CurrentMode::clock;
 				} else {
-					logButtonEvent("AuxButton0", event.type);
+					if (event.type == InputEventType::Pressed) {
+						switch (number_display_mode) {
+							case NumberDisplayMode::Periodic:
+								number_display_mode = NumberDisplayMode::Hour12;
+								Serial.println("Clock mode: 12-hour");
+								break;
+							case NumberDisplayMode::Hour12:
+								number_display_mode = NumberDisplayMode::Hour24;
+								Serial.println("Clock mode: 24-hour");
+								break;
+							case NumberDisplayMode::Hour24:
+								number_display_mode = NumberDisplayMode::Periodic;
+								Serial.println("Clock mode: periodic");
+								break;
+						}
+					} else {
+						logButtonEvent("AuxButton0", event.type);
+					}
 				}
 				break;
 			case InputKey::AuxButton1:
+				if (current_mode != CurrentMode::stopwatch) {
+					current_mode = CurrentMode::stopwatch;
+				} else {
+				}
 				logButtonEvent("AuxButton1", event.type);
 				break;
 			case InputKey::AuxButton2:
+				if (current_mode != CurrentMode::timer) {
+					current_mode = CurrentMode::timer;
+				} else {
+				}
 				logButtonEvent("AuxButton2", event.type);
 				break;
 			case InputKey::AuxButton3:
+				if (current_mode != CurrentMode::alarm) {
+					current_mode = CurrentMode::alarm;
+				} else {
+				}
 				logButtonEvent("AuxButton3", event.type);
 				break;
 			case InputKey::AuxButton4:
+				if (current_mode != CurrentMode::settings) {
+					current_mode = CurrentMode::settings;
+				} else {
+				}
 				logButtonEvent("AuxButton4", event.type);
 				break;
 		}
