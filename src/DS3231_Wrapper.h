@@ -6,8 +6,7 @@
 #include <Wire.h>
 #include <DS3231.h>
 
-class DS3231_Wrapper
-{
+class DS3231_Wrapper {
 public:
 	DS3231_Wrapper(); // Constructor
 

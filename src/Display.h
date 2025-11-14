@@ -18,7 +18,7 @@ public:
 	void write_string(const std::string& text, CRGB* colors, bool fade = false);
 	void incrementBrightness();
 	void decrementBrightness();
-   	void tick();
+	void tick();
 
 private:
 	uint8_t height;

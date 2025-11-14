@@ -1,6 +1,6 @@
 #include "clockText.h"
 
-void getTime(uint8_t hours, uint8_t minutes, NumberDisplayMode mode, std::string& text, CRGB* colors){
+void getTime(uint8_t hours, uint8_t minutes, NumberDisplayMode mode, std::string& text, CRGB* colors) {
 	switch (mode) {
 		case NumberDisplayMode::Hour12: {
 			char buffer[6];
@@ -27,5 +27,5 @@ void getTime(uint8_t hours, uint8_t minutes, NumberDisplayMode mode, std::string
 		case NumberDisplayMode::Periodic:
 			convert_to_periodic_time(hours, minutes, text, colors);
 			break;
-		}
+	}
 }

@@ -12,13 +12,16 @@ void DS3231_Wrapper::printTime() {
 
 	// Print time in HH:MM:SS format
 	Serial.print("Current Time: ");
-	if (hour < 10) Serial.print("0");
+	if (hour < 10)
+		Serial.print("0");
 	Serial.print(hour);
 	Serial.print(":");
-	if (minute < 10) Serial.print("0");
+	if (minute < 10)
+		Serial.print("0");
 	Serial.print(minute);
 	Serial.print(":");
-	if (second < 10) Serial.print("0");
+	if (second < 10)
+		Serial.print("0");
 	Serial.println(second);
 }
 

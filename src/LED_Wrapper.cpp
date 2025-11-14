@@ -17,23 +17,20 @@ void LED_Wrapper::clearAll() {
 }
 
 void LED_Wrapper::setLED(int index, CRGB color) {
-	if (index >= 0 && index < numLEDs)
-	{ // Ensure the index is valid (0-based index)
+	if (index >= 0 && index < numLEDs) { // Ensure the index is valid (0-based index)
 		leds[index] = color; // Set the color of the LED at the given index
 		FastLED.show(); // Update the LED strip
 	}
 }
 
 void LED_Wrapper::preSetLED(int index, CRGB color) {
-	if (index >= 0 && index < numLEDs)
-	{ // Ensure the index is valid (0-based index)
+	if (index >= 0 && index < numLEDs) { // Ensure the index is valid (0-based index)
 		leds[index] = color; // Set the color of the LED at the given index
 	}
 }
 
 void LED_Wrapper::setColors(CRGB* colors, int numLEDs) {
-	for (int i = 0; i < numLEDs && i < this->numLEDs; i++)
-	{
+	for (int i = 0; i < numLEDs && i < this->numLEDs; i++) {
 		leds[i] = colors[i]; // Set each LED's color
 	}
 	FastLED.show(); // Update the LED strip

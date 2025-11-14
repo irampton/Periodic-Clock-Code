@@ -2,16 +2,14 @@
 #define RP2040_ROTARY_H
 
 // Define state identifiers
-enum Rotary_State
-{
+enum Rotary_State {
 	Rotary_START,
 	Rotary_CW,
 	Rotary_CCW,
 	Rotary_BTN
 };
 
-class Rotary
-{
+class Rotary {
 private:
 	// Member variables to store the pin numbers
 	int CW_pin;
