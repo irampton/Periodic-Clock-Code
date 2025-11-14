@@ -1,10 +1,14 @@
 #include "Display.h"
 
 #include <Arduino.h>
+#include <limits>
+#include <utility>
 
 #define BRIGHTNESS_STEP 16
 #define INITIAL_BRIGHTNESS 64
 #define FADE_DURATION_MS 1000
+#define SCROLL_STEP_INTERVAL_MS 100
+#define SCROLL_WRAP_SPACER_COLUMNS 3
 
 Display::Display(int rows, int cols, int led_pin)
 	: height(rows),
@@ -13,7 +17,10 @@ Display::Display(int rows, int cols, int led_pin)
 	  newData(false),
 	  fadeActive(false),
 	  fadeStartMillis(0),
-	  driver(led_pin, rows * cols) {
+	  driver(led_pin, rows * cols),
+	  scrollOffset(0),
+	  scrollActive(false),
+	  lastScrollUpdateMillis(0) {
 	const size_t totalPixels = static_cast<size_t>(height) * static_cast<size_t>(width);
 	displayedFrame.assign(totalPixels, CRGB::Black);
 	targetFrame = displayedFrame;
@@ -27,99 +34,30 @@ void Display::init() {
 	newData = false;
 	fadeActive = false;
 	fadeStartMillis = 0;
+	disableScroll();
 }
 
-void Display::write_string(char text[], CRGB* colors, bool fade) {
+void Display::write_characters(char text[], CRGB* colors, bool fade) {
 	if (text == nullptr) {
 		return;
 	}
 
+	disableScroll();
 	const size_t charCount = std::strlen(text);
-	const int totalPixels = height * width;
-
-	if (totalPixels <= 0) {
+	ensureFrameSize();
+	if (targetFrame.empty()) {
 		return;
 	}
 
-	const size_t pixelCount = static_cast<size_t>(totalPixels);
-	if (displayedFrame.size() != pixelCount) {
-		displayedFrame.assign(pixelCount, CRGB::Black);
-		targetFrame = displayedFrame;
-		fadeFromFrame = displayedFrame;
-	}
-
-	std::fill(targetFrame.begin(), targetFrame.end(), CRGB::Black);
-
-	if (charCount == 0) {
-		// Let the fade logic handle transitions to a blank frame.
-		fade = fade && (FADE_DURATION_MS > 0);
-	}
-
-	struct GlyphEntry {
-		const Glyph* glyph;
-		size_t charIndex;
-	};
-
-	std::vector<GlyphEntry> glyphs;
-	glyphs.reserve(charCount);
-
-	for (size_t i = 0; i < charCount; ++i) {
-		const Glyph* glyph = font_lookup_ascii(text[i]);
-		if (glyph != nullptr) {
-			glyphs.push_back({glyph, i});
-		}
-	}
-
-	if (glyphs.empty()) {
-		// Nothing to draw beyond the cleared target frame.
-		fade = fade && (FADE_DURATION_MS > 0);
-	}
-
+	std::vector<GlyphColorEntry> glyphs = collectGlyphs(text, charCount, colors);
 	std::vector<uint8_t> columns;
 	std::vector<CRGB> columnColors;
 	columns.reserve(width);
 	columnColors.reserve(width);
-
-	for (const GlyphEntry& entry : glyphs) {
-		if (columns.size() >= static_cast<size_t>(width)) {
-			break;
-		}
-
-		const Glyph& glyph = *entry.glyph;
-		const size_t remaining = static_cast<size_t>(width) - columns.size();
-		const uint8_t copyWidth = static_cast<uint8_t>(
-			std::min(static_cast<size_t>(glyph.width), remaining));
-		const CRGB glyphColor = colors ? colors[entry.charIndex] : CRGB::White;
-
-		for (uint8_t col = 0; col < copyWidth; ++col) {
-			const uint8_t columnByte = font_column_byte(glyph, col);
-			columns.push_back(columnByte);
-			columnColors.push_back(glyphColor);
-		}
-		if (columns.size() < width) {
-			columns.push_back(0x00);
-			columnColors.push_back(glyphColor);
-		}
-	}
-
-	const int columnCount = std::min(columns.size(), static_cast<size_t>(width));
-	const int totalSize = columnCount * height;
-
-	for (int col = 0; col < columnCount; ++col) {
-		const uint8_t columnBits = columns[col];
-		const bool reverse = ((width - 1 - col) % 9) % 2 == 1;
-		int colStart = totalSize - 1 - col * height;
-		for (int row = 0; row < height; ++row) {
-			const bool pixelOn = columnBits & (0b1 << row);
-			const int ledIndex = reverse ? colStart - row : colStart - height + 1 + row;
-			if (ledIndex >= 0 && ledIndex < totalPixels) {
-				targetFrame[static_cast<size_t>(ledIndex)] = pixelOn ? columnColors[col] : CRGB::Black;
-			}
-		}
-	}
+	buildColumns(glyphs, static_cast<size_t>(width), columns, columnColors);
+	renderColumnsToFrame(columns, columnColors, 0, false, targetFrame);
 
 	fade = fade && (FADE_DURATION_MS > 0);
-
 	if (fade) {
 		fadeFromFrame = displayedFrame;
 		fadeActive = true;
@@ -146,6 +84,20 @@ void Display::tick() {
 			fadeActive = false;
 			displayedFrame = targetFrame;
 		}
+	} else if (scrollActive) {
+		displayedFrame = targetFrame;
+		applyFrame(displayedFrame);
+		driver.renderLEDs();
+		if (scrollColumns.empty()) {
+			disableScroll();
+		} else {
+			const uint32_t now = millis();
+			if (now - lastScrollUpdateMillis >= SCROLL_STEP_INTERVAL_MS) {
+				advanceScrollOffset();
+				updateScrollTarget();
+				lastScrollUpdateMillis = now;
+			}
+		}
 	} else if (newData) {
 		applyFrame(displayedFrame);
 		driver.renderLEDs();
@@ -154,9 +106,73 @@ void Display::tick() {
 }
 
 void Display::write_string(const std::string& text, CRGB* colors, bool fade) {
-	// const_cast is fine here because your other function expects
-	// a mutable char array, but we’re not modifying it.
-	write_string(const_cast<char*>(text.c_str()), colors, fade);
+	disableScroll();
+	const size_t charCount = text.size();
+
+	if (charCount == 0) {
+		write_characters(const_cast<char*>(""), colors, fade);
+		return;
+	}
+
+	ensureFrameSize();
+	if (targetFrame.empty()) {
+		return;
+	}
+
+	std::vector<GlyphColorEntry> glyphs = collectGlyphs(text.c_str(), charCount, colors);
+	std::vector<uint8_t> columns;
+	std::vector<CRGB> columnColors;
+	const size_t maxColumns = std::numeric_limits<size_t>::max();
+	buildColumns(glyphs, maxColumns, columns, columnColors);
+
+	if (columns.size() <= static_cast<size_t>(width)) {
+		renderColumnsToFrame(columns, columnColors, 0, false, targetFrame);
+		fade = fade && (FADE_DURATION_MS > 0);
+		if (fade) {
+			fadeFromFrame = displayedFrame;
+			fadeActive = true;
+			fadeStartMillis = millis();
+			newData = false;
+		} else {
+			displayedFrame = targetFrame;
+			newData = true;
+			fadeActive = false;
+		}
+		return;
+	}
+
+	scrollColumns = std::move(columns);
+	scrollColumnColors = std::move(columnColors);
+	for (int spacer = 0; spacer < SCROLL_WRAP_SPACER_COLUMNS; ++spacer) {
+		scrollColumns.push_back(0x00);
+		scrollColumnColors.push_back(CRGB::Black);
+	}
+	scrollOffset = 0;
+	scrollActive = true;
+	lastScrollUpdateMillis = millis();
+	updateScrollTarget();
+
+	fade = fade && (FADE_DURATION_MS > 0);
+	if (fade) {
+		fadeFromFrame = displayedFrame;
+		fadeActive = true;
+		fadeStartMillis = millis();
+		newData = false;
+	} else {
+		displayedFrame = targetFrame;
+		newData = false;
+		fadeActive = false;
+	}
+}
+
+void Display::write_string(const std::string& text, const CRGB& color, bool fade) {
+	if (text.empty()) {
+		write_string(text, static_cast<CRGB*>(nullptr), fade);
+		return;
+	}
+
+	std::vector<CRGB> colorBuffer(text.size(), color);
+	write_string(text, colorBuffer.data(), fade);
 }
 
 void Display::incrementBrightness() {
@@ -201,4 +217,184 @@ void Display::renderFadeFrame(float progress) {
 		displayedFrame[idx] = blended;
 		driver.preSetLED(static_cast<int>(idx), blended);
 	}
+}
+
+void Display::ensureFrameSize() {
+	const size_t totalPixels = static_cast<size_t>(height) * static_cast<size_t>(width);
+	if (totalPixels == 0) {
+		displayedFrame.clear();
+		targetFrame.clear();
+		fadeFromFrame.clear();
+		return;
+	}
+
+	if (displayedFrame.size() != totalPixels) {
+		displayedFrame.assign(totalPixels, CRGB::Black);
+		targetFrame = displayedFrame;
+		fadeFromFrame = displayedFrame;
+	}
+}
+
+CRGB Display::colorForIndex(size_t index, CRGB* colors, CRGB& lastColor, bool& hasColor) const {
+	if (colors == nullptr) {
+		if (!hasColor) {
+			lastColor = CRGB::White;
+			hasColor = true;
+		}
+		return lastColor;
+	}
+
+	const CRGB candidate = colors[index];
+	lastColor = candidate;
+	hasColor = true;
+	return candidate;
+}
+
+bool Display::buildGlyphEntry(char character,
+                              size_t index,
+                              CRGB* colors,
+                              GlyphColorEntry& entry,
+                              CRGB& lastColor,
+                              bool& hasColor) const {
+	const Glyph* glyph = font_lookup_ascii(character);
+	if (glyph == nullptr) {
+		return false;
+	}
+
+	entry.glyph = glyph;
+	entry.color = colorForIndex(index, colors, lastColor, hasColor);
+	return true;
+}
+
+std::vector<Display::GlyphColorEntry> Display::collectGlyphs(const char* text,
+                                                             size_t charCount,
+                                                             CRGB* colors) const {
+	std::vector<GlyphColorEntry> glyphs;
+	if (text == nullptr || charCount == 0) {
+		return glyphs;
+	}
+
+	glyphs.reserve(charCount);
+	CRGB lastColor = CRGB::White;
+	bool hasColor = false;
+	for (size_t idx = 0; idx < charCount; ++idx) {
+		GlyphColorEntry entry{};
+		if (buildGlyphEntry(text[idx], idx, colors, entry, lastColor, hasColor)) {
+			glyphs.push_back(entry);
+		}
+	}
+	return glyphs;
+}
+
+void Display::buildColumns(const std::vector<GlyphColorEntry>& glyphs,
+                           size_t maxColumns,
+                           std::vector<uint8_t>& columns,
+                           std::vector<CRGB>& columnColors) const {
+	columns.clear();
+	columnColors.clear();
+
+	if (glyphs.empty() || maxColumns == 0) {
+		return;
+	}
+
+	const bool unlimited = (maxColumns == std::numeric_limits<size_t>::max());
+
+	for (size_t idx = 0; idx < glyphs.size(); ++idx) {
+		const Glyph& glyph = *glyphs[idx].glyph;
+		const CRGB glyphColor = glyphs[idx].color;
+
+		size_t remaining = unlimited ? glyph.width : (maxColumns > columns.size() ? maxColumns - columns.size() : 0);
+		if (!unlimited && remaining == 0) {
+			break;
+		}
+
+		const size_t copyWidth = unlimited ? glyph.width : std::min(remaining, static_cast<size_t>(glyph.width));
+		for (size_t col = 0; col < copyWidth; ++col) {
+			const uint8_t columnByte = font_column_byte(glyph, static_cast<int>(col));
+			columns.push_back(columnByte);
+			columnColors.push_back(glyphColor);
+		}
+
+		const bool hasMoreGlyphs = (idx + 1) < glyphs.size();
+		if (hasMoreGlyphs && (unlimited || columns.size() < maxColumns)) {
+			columns.push_back(0x00);
+			columnColors.push_back(glyphColor);
+		}
+	}
+}
+
+void Display::renderColumnsToFrame(const std::vector<uint8_t>& columns,
+                                   const std::vector<CRGB>& columnColors,
+                                   size_t startColumn,
+                                   bool wrapColumns,
+                                   std::vector<CRGB>& frame) const {
+	const size_t totalPixels = static_cast<size_t>(height) * static_cast<size_t>(width);
+	if (frame.size() != totalPixels) {
+		return;
+	}
+
+	std::fill(frame.begin(), frame.end(), CRGB::Black);
+
+	if (height == 0 || width == 0 || columns.empty()) {
+		return;
+	}
+
+	size_t effectiveColumns = static_cast<size_t>(width);
+	if (!wrapColumns) {
+		if (startColumn >= columns.size()) {
+			return;
+		}
+		const size_t remaining = columns.size() - startColumn;
+		effectiveColumns = std::min(remaining, static_cast<size_t>(width));
+	}
+
+	const int columnCount = static_cast<int>(effectiveColumns);
+	if (columnCount <= 0) {
+		return;
+	}
+
+	const int totalSize = columnCount * height;
+	for (int col = 0; col < columnCount; ++col) {
+		size_t sourceIdx = wrapColumns
+			                   ? (startColumn + static_cast<size_t>(col)) % columns.size()
+			                   : startColumn + static_cast<size_t>(col);
+		if (!wrapColumns && sourceIdx >= columns.size()) {
+			break;
+		}
+
+		const uint8_t columnBits = columns[sourceIdx];
+		const CRGB columnColor = columnColors[sourceIdx];
+		const bool reverse = ((width - 1 - col) % 9) % 2 == 1;
+		const int colStart = totalSize - 1 - col * height;
+		for (int row = 0; row < height; ++row) {
+			const bool pixelOn = (columnBits & (0b1 << row)) != 0;
+			const int ledIndex = reverse ? colStart - row : colStart - height + 1 + row;
+			if (ledIndex >= 0 && ledIndex < static_cast<int>(totalPixels)) {
+				frame[static_cast<size_t>(ledIndex)] = pixelOn ? columnColor : CRGB::Black;
+			}
+		}
+	}
+}
+
+void Display::updateScrollTarget() {
+	if (!scrollActive || scrollColumns.empty()) {
+		return;
+	}
+	renderColumnsToFrame(scrollColumns, scrollColumnColors, scrollOffset, true, targetFrame);
+}
+
+void Display::advanceScrollOffset() {
+	if (scrollColumns.empty()) {
+		scrollOffset = 0;
+		return;
+	}
+	scrollOffset = (scrollOffset + 1) % scrollColumns.size();
+}
+
+void Display::disableScroll() {
+	scrollActive = false;
+	scrollOffset = 0;
+	scrollColumns.clear();
+	scrollColumnColors.clear();
+	lastScrollUpdateMillis = 0;
 }

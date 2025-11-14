@@ -14,8 +14,9 @@ class Display {
 public:
 	Display(int rows, int cols, int led_pin);
 	void init();
-	void write_string(char text[], CRGB* colors, bool fade = false);
+	void write_characters(char text[], CRGB* colors, bool fade = false);
 	void write_string(const std::string& text, CRGB* colors, bool fade = false);
+	void write_string(const std::string& text, const CRGB& color, bool fade = false);
 	void incrementBrightness();
 	void decrementBrightness();
 	void tick();
@@ -31,6 +32,32 @@ private:
 	std::vector<CRGB> displayedFrame;
 	std::vector<CRGB> targetFrame;
 	std::vector<CRGB> fadeFromFrame;
+	std::vector<uint8_t> scrollColumns;
+	std::vector<CRGB> scrollColumnColors;
+	size_t scrollOffset;
+	bool scrollActive;
+	uint32_t lastScrollUpdateMillis;
 	void applyFrame(const std::vector<CRGB>& frame);
 	void renderFadeFrame(float progress);
+
+	struct GlyphColorEntry {
+		const Glyph* glyph;
+		CRGB color;
+	};
+
+	void ensureFrameSize();
+	CRGB colorForIndex(size_t index, CRGB* colors, CRGB& lastColor, bool& hasColor) const;
+	bool buildGlyphEntry(char character, size_t index, CRGB* colors, GlyphColorEntry& entry, CRGB& lastColor,
+	                     bool& hasColor) const;
+	std::vector<GlyphColorEntry> collectGlyphs(const char* text, size_t charCount, CRGB* colors) const;
+	void buildColumns(const std::vector<GlyphColorEntry>& glyphs, size_t maxColumns, std::vector<uint8_t>& columns,
+	                  std::vector<CRGB>& columnColors) const;
+	void renderColumnsToFrame(const std::vector<uint8_t>& columns,
+	                          const std::vector<CRGB>& columnColors,
+	                          size_t startColumn,
+	                          bool wrapColumns,
+	                          std::vector<CRGB>& frame) const;
+	void updateScrollTarget();
+	void advanceScrollOffset();
+	void disableScroll();
 };

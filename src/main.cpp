@@ -78,6 +78,7 @@ void loop() {
 	}
 
 	// Go through any input that loop1() picked up
+	static bool displayInitialised = false;
 	InputEvent event{};
 	while (InputEventBuffer::pop(event)) {
 		switch (event.key) {
@@ -99,6 +100,7 @@ void loop() {
 			case InputKey::AuxButton0:
 				if (current_mode != CurrentMode::clock) {
 					current_mode = CurrentMode::clock;
+					displayInitialised = false;
 				} else {
 					if (event.type == InputEventType::Pressed) {
 						switch (number_display_mode) {
@@ -123,6 +125,7 @@ void loop() {
 			case InputKey::AuxButton1:
 				if (current_mode != CurrentMode::stopwatch) {
 					current_mode = CurrentMode::stopwatch;
+					displayInitialised = false;
 				} else {
 				}
 				logButtonEvent("AuxButton1", event.type);
@@ -130,6 +133,7 @@ void loop() {
 			case InputKey::AuxButton2:
 				if (current_mode != CurrentMode::timer) {
 					current_mode = CurrentMode::timer;
+					displayInitialised = false;
 				} else {
 				}
 				logButtonEvent("AuxButton2", event.type);
@@ -137,6 +141,7 @@ void loop() {
 			case InputKey::AuxButton3:
 				if (current_mode != CurrentMode::alarm) {
 					current_mode = CurrentMode::alarm;
+					displayInitialised = false;
 				} else {
 				}
 				logButtonEvent("AuxButton3", event.type);
@@ -144,6 +149,7 @@ void loop() {
 			case InputKey::AuxButton4:
 				if (current_mode != CurrentMode::settings) {
 					current_mode = CurrentMode::settings;
+					displayInitialised = false;
 				} else {
 				}
 				logButtonEvent("AuxButton4", event.type);
@@ -158,7 +164,6 @@ void loop() {
 	switch (current_mode) {
 		case CurrentMode::clock: {
 			// Decide if we need to update the clock, then update it
-			static bool displayInitialised = false;
 			static int displayedHours = -1;
 			static int displayedMinutes = -1;
 			static NumberDisplayMode displayedMode = NumberDisplayMode::Periodic;
@@ -175,7 +180,7 @@ void loop() {
 
 				getTime(hours, minutes, number_display_mode, text, colors);
 
-				display->write_string(text, colors, !modeChanged);
+				display->write_string(text, colors, true);
 				displayedHours = hours;
 				displayedMinutes = minutes;
 				displayedMode = number_display_mode;
@@ -184,12 +189,28 @@ void loop() {
 			break;
 		}
 		case CurrentMode::stopwatch:
+			if (!displayInitialised) {
+				display->write_string("Stopwatch", CRGB::Blue, true);
+				displayInitialised = true;
+			}
 			break;
 		case CurrentMode::timer:
+			if (!displayInitialised) {
+				display->write_string("Timer", CRGB::Green, true);
+				displayInitialised = true;
+			}
 			break;
 		case CurrentMode::alarm:
+			if (!displayInitialised) {
+				display->write_string("Alarm", CRGB::Purple, true);
+				displayInitialised = true;
+			}
 			break;
 		case CurrentMode::settings:
+			if (!displayInitialised) {
+				display->write_string("Settings", CRGB::Red2, true);
+				displayInitialised = true;
+			}
 			break;
 	}
 
