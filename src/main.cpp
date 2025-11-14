@@ -19,7 +19,16 @@ Rotary* r1 = new Rotary(9, 10, 8);
 DS3231_Wrapper myRTC;
 Display* display = new Display(ROWS, COLUMNS, LED_PIN);
 
-ClockMode clock_mode = ClockMode::Periodic;
+enum class CurrentMode {
+    clock,
+    stopwatch,
+    timer,
+    alarm,
+    settings,
+};
+
+NumberDisplayMode number_display_mode = NumberDisplayMode::Periodic;
+CurrentMode current_mode = CurrentMode::clock;
 
 const char* inputEventTypeToString(InputEventType type) {
     switch (type) {
@@ -89,17 +98,17 @@ void loop() {
             break;
         case InputKey::AuxButton0:
             if (event.type == InputEventType::Pressed) {
-                switch (clock_mode) {
-                case ClockMode::Periodic:
-                    clock_mode = ClockMode::Hour12;
+                switch (number_display_mode) {
+                case NumberDisplayMode::Periodic:
+                    number_display_mode = NumberDisplayMode::Hour12;
                     Serial.println("Clock mode: 12-hour");
                     break;
-                case ClockMode::Hour12:
-                    clock_mode = ClockMode::Hour24;
+                case NumberDisplayMode::Hour12:
+                    number_display_mode = NumberDisplayMode::Hour24;
                     Serial.println("Clock mode: 24-hour");
                     break;
-                case ClockMode::Hour24:
-                    clock_mode = ClockMode::Periodic;
+                case NumberDisplayMode::Hour24:
+                    number_display_mode = NumberDisplayMode::Periodic;
                     Serial.println("Clock mode: periodic");
                     break;
                 }
@@ -126,29 +135,42 @@ void loop() {
         Serial.println("Input queue overflow");
     }
 
-    // Decide if we need to update the clock, then update i
-    static bool displayInitialised = false;
-    static int displayedHours = -1;
-    static int displayedMinutes = -1;
-    static ClockMode displayedMode = ClockMode::Periodic;
+    switch (current_mode) {
+    case CurrentMode::clock: {
+        // Decide if we need to update the clock, then update it
+        static bool displayInitialised = false;
+        static int displayedHours = -1;
+        static int displayedMinutes = -1;
+        static NumberDisplayMode displayedMode = NumberDisplayMode::Periodic;
 
-    const int hours = myRTC.getHours();
-    const int minutes = myRTC.getMinutes();
+        const int hours = myRTC.getHours();
+        const int minutes = myRTC.getMinutes();
 
-    const bool timeChanged = (hours != displayedHours) || (minutes != displayedMinutes);
-    const bool modeChanged = (clock_mode != displayedMode);
+        const bool timeChanged = (hours != displayedHours) || (minutes != displayedMinutes);
+        const bool modeChanged = (number_display_mode != displayedMode);
 
-    if (!displayInitialised || timeChanged || modeChanged) {
-        std::string text;
-        CRGB colors[CLOCK_LENGTH];
+        if (!displayInitialised || timeChanged || modeChanged) {
+            std::string text;
+            CRGB colors[CLOCK_LENGTH];
 
-        getTime( hours, minutes, clock_mode, text, colors);
+            getTime(hours, minutes, number_display_mode, text, colors);
 
-        display->write_string(text, colors, !modeChanged);
-        displayedHours = hours;
-        displayedMinutes = minutes;
-        displayedMode = clock_mode;
-        displayInitialised = true;
+            display->write_string(text, colors, !modeChanged);
+            displayedHours = hours;
+            displayedMinutes = minutes;
+            displayedMode = number_display_mode;
+            displayInitialised = true;
+        }
+        break;
+    }
+    case CurrentMode::stopwatch:
+        break;
+    case CurrentMode::timer:
+        break;
+    case CurrentMode::alarm:
+        break;
+    case CurrentMode::settings:
+        break;
     }
 
 	// Update the display @ up to 60 frames per second
