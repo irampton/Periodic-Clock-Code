@@ -3,6 +3,7 @@
 
 #include "Display.h"
 #include "DS3231_Wrapper.h"
+#include "Stopwatch.h"
 
 #include "Rotary.h"
 #include "serial.h"
@@ -17,6 +18,7 @@
 
 Rotary* r1 = new Rotary(9, 10, 8);
 DS3231_Wrapper myRTC;
+Stopwatch stopwatch;
 Display* display = new Display(ROWS, COLUMNS, LED_PIN);
 
 enum class CurrentMode {
@@ -31,8 +33,7 @@ NumberDisplayMode number_display_mode = NumberDisplayMode::Periodic;
 CurrentMode current_mode = CurrentMode::clock;
 
 const char* inputEventTypeToString(InputEventType type) {
-	switch (type)
-	{
+	switch (type) {
 		case InputEventType::Pressed:
 			return "Pressed";
 		case InputEventType::DoubleClick:
@@ -60,6 +61,8 @@ void setup() {
 	pinMode(BUZZER_PIN, OUTPUT);
 
 	Serial.begin(9600);
+
+	stopwatch.init(myRTC);
 }
 
 std::string clock_text;
@@ -71,18 +74,14 @@ void loop() {
 	// Check for anything over the serial port
 	// This is used to set the time programmatically
 	static String serialBuffer;
-	while (Serial.available() > 0)
-	{
+	while (Serial.available() > 0) {
 		const char incoming = static_cast<char>(Serial.read());
-		if (incoming == '\r' || incoming == '\n')
-		{
-			if (serialBuffer.length() > 0)
-			{
+		if (incoming == '\r' || incoming == '\n') {
+			if (serialBuffer.length() > 0) {
 				handleSerialCommand(serialBuffer, myRTC);
 				serialBuffer = "";
 			}
-		} else if (serialBuffer.length() < 32)
-		{
+		} else if (serialBuffer.length() < 32) {
 			serialBuffer += incoming;
 		}
 	}
@@ -90,45 +89,37 @@ void loop() {
 	// Go through any input that loop1() picked up
 	static bool displayInitialised = false;
 	InputEvent event{};
-	while (InputEventBuffer::pop(event))
-	{
-		switch (event.type)
-		{
+	while (InputEventBuffer::pop(event)) {
+		switch (event.type) {
 			//switch modes on a double click
 			case InputEventType::DoubleClick:
-				switch (event.key)
-				{
+				switch (event.key) {
 					case InputKey::AuxButton0:
-						if (current_mode != CurrentMode::clock)
-						{
+						if (current_mode != CurrentMode::clock) {
 							current_mode = CurrentMode::clock;
 							displayInitialised = false;
 						}
 						break;
 					case InputKey::AuxButton1:
-						if (current_mode != CurrentMode::stopwatch)
-						{
+						if (current_mode != CurrentMode::stopwatch) {
 							current_mode = CurrentMode::stopwatch;
 							displayInitialised = false;
 						}
 						break;
 					case InputKey::AuxButton2:
-						if (current_mode != CurrentMode::timer)
-						{
+						if (current_mode != CurrentMode::timer) {
 							current_mode = CurrentMode::timer;
 							displayInitialised = false;
 						}
 						break;
 					case InputKey::AuxButton3:
-						if (current_mode != CurrentMode::alarm)
-						{
+						if (current_mode != CurrentMode::alarm) {
 							current_mode = CurrentMode::alarm;
 							displayInitialised = false;
 						}
 						break;
 					case InputKey::AuxButton4:
-						if (current_mode != CurrentMode::settings)
-						{
+						if (current_mode != CurrentMode::settings) {
 							current_mode = CurrentMode::settings;
 							displayInitialised = false;
 						}
@@ -138,18 +129,15 @@ void loop() {
 				}
 				break;
 			case InputEventType::Pressed:
-				switch (event.key)
-				{
+				switch (event.key) {
 					case InputKey::RotaryCW:
-						if (event.type == InputEventType::Pressed)
-						{
+						if (event.type == InputEventType::Pressed) {
 							display->incrementBrightness();
 							Serial.println("RotaryCW");
 						}
 						break;
 					case InputKey::RotaryCCW:
-						if (event.type == InputEventType::Pressed)
-						{
+						if (event.type == InputEventType::Pressed) {
 							display->decrementBrightness();
 							Serial.println("RotaryCCW");
 						}
@@ -158,8 +146,7 @@ void loop() {
 						logButtonEvent("RotaryButton", event.type);
 						break;
 					case InputKey::AuxButton0:
-						switch (number_display_mode)
-						{
+						switch (number_display_mode) {
 							case NumberDisplayMode::Periodic:
 								number_display_mode = NumberDisplayMode::Hour12;
 								Serial.println("Clock mode: 12-hour");
@@ -175,10 +162,9 @@ void loop() {
 						}
 						break;
 					case InputKey::AuxButton1:
-						switch (current_mode)
-						{
+						switch (current_mode) {
 							case CurrentMode::stopwatch:
-
+								stopwatch.toggle();
 								break;
 							default:
 								break;
@@ -193,11 +179,18 @@ void loop() {
 				}
 				break;
 			case InputEventType::Hold:
-				switch (event.type)
-				{
+				switch (event.type) {
 					case InputKey::AuxButton0:
 						break;
 					case InputKey::AuxButton1:
+						switch (current_mode) {
+							case CurrentMode::stopwatch:
+								stopwatch.stop();
+								stopwatch.reset();
+							break;
+							default:
+								break;
+						}
 						break;
 					case InputKey::AuxButton2:
 						break;
@@ -212,15 +205,12 @@ void loop() {
 		}
 	}
 
-	if (InputEventBuffer::consumeOverflowFlag())
-	{
+	if (InputEventBuffer::consumeOverflowFlag()) {
 		Serial.println("Input queue overflow");
 	}
 
-	switch (current_mode)
-	{
-		case CurrentMode::clock:
-		{
+	switch (current_mode) {
+		case CurrentMode::clock: {
 			// Decide if we need to update the clock, then update it
 			static int displayedHours = -1;
 			static int displayedMinutes = -1;
@@ -232,8 +222,7 @@ void loop() {
 			const bool timeChanged = (hours != displayedHours) || (minutes != displayedMinutes);
 			const bool modeChanged = (number_display_mode != displayedMode);
 
-			if (!displayInitialised || timeChanged || modeChanged)
-			{
+			if (!displayInitialised || timeChanged || modeChanged) {
 				getTime(hours, minutes, number_display_mode, clock_text, clock_colors);
 
 				display->write_string(clock_text, clock_colors, true);
@@ -244,30 +233,46 @@ void loop() {
 			}
 			break;
 		}
-		case CurrentMode::stopwatch:
-			if (!displayInitialised)
-			{
-				display->write_string("Stopwatch", CRGB::Blue, true);
+		case CurrentMode::stopwatch: {
+			static uint8_t displayedHigh = 255;
+			static uint8_t displayedLow = 255;
+			static bool displayedUsingHours = false;
+
+			uint8_t swHours = 0;
+			uint8_t swMinutes = 0;
+			uint8_t swSeconds = 0;
+			stopwatch.getTime(&swHours, &swMinutes, &swSeconds);
+
+			const bool usingHours = swHours > 0;
+			const uint8_t displayHigh = usingHours ? swHours : swMinutes;
+			const uint8_t displayLow = usingHours ? swMinutes : swSeconds;
+			const bool timeChanged = (displayHigh != displayedHigh) || (displayLow != displayedLow);
+			const bool modeChanged = usingHours != displayedUsingHours;
+
+			if (!displayInitialised || timeChanged || modeChanged) {
+				getTime(displayHigh, displayLow, number_display_mode, clock_text, clock_colors);
+				display->write_string(clock_text, clock_colors, true);
+				displayedHigh = displayHigh;
+				displayedLow = displayLow;
+				displayedUsingHours = usingHours;
 				displayInitialised = true;
 			}
 			break;
+		}
 		case CurrentMode::timer:
-			if (!displayInitialised)
-			{
+			if (!displayInitialised) {
 				display->write_string("Timer", CRGB::Green, true);
 				displayInitialised = true;
 			}
 			break;
 		case CurrentMode::alarm:
-			if (!displayInitialised)
-			{
+			if (!displayInitialised) {
 				display->write_string("Alarm", CRGB::Purple, true);
 				displayInitialised = true;
 			}
 			break;
 		case CurrentMode::settings:
-			if (!displayInitialised)
-			{
+			if (!displayInitialised) {
 				display->write_string("Settings", CRGB::Red2, true);
 				displayInitialised = true;
 			}
@@ -297,8 +302,7 @@ struct ButtonState {
 
 void setup1() {
 	r1->init();
-	for (uint8_t pin : kButtonPins)
-	{
+	for (uint8_t pin : kButtonPins) {
 		pinMode(pin, INPUT_PULLUP);
 	}
 }
@@ -310,51 +314,40 @@ void loop1() {
 	bool rotaryInput[3];
 	r1->loop(rotaryInput);
 
-	if (rotaryInput[0])
-	{
+	if (rotaryInput[0]) {
 		InputEventBuffer::push(InputKey::RotaryCW, InputEventType::Pressed);
 	}
-	if (rotaryInput[1])
-	{
+	if (rotaryInput[1]) {
 		InputEventBuffer::push(InputKey::RotaryCCW, InputEventType::Pressed);
 	}
-	if (rotaryInput[2])
-	{
+	if (rotaryInput[2]) {
 		InputEventBuffer::push(InputKey::RotaryButton, InputEventType::Pressed);
 	}
 
-	for (size_t i = 0; i < kButtonCount; ++i)
-	{
+	for (size_t i = 0; i < kButtonCount; ++i) {
 		auto& state = buttonStates[i];
 		const uint8_t pin = kButtonPins[i];
 		const bool isPressedNow = digitalRead(pin) == LOW;
 		const auto key = static_cast<InputKey>(
 			static_cast<uint8_t>(InputKey::AuxButton0) + static_cast<uint8_t>(i));
 
-		if (isPressedNow != state.isPressed)
-		{
+		if (isPressedNow != state.isPressed) {
 			state.debounceCounter++;
-			if (state.debounceCounter >= kDebounceLimit)
-			{
+			if (state.debounceCounter >= kDebounceLimit) {
 				state.isPressed = isPressedNow;
 				state.debounceCounter = 0;
 
-				if (isPressedNow)
-				{
+				if (isPressedNow) {
 					state.pressStartMs = millis();
 					state.holdEventSent = false;
-				} else
-				{
-					if (!state.holdEventSent)
-					{
+				} else {
+					if (!state.holdEventSent) {
 						const uint32_t releaseTime = millis();
 						if (state.pendingSingleClick &&
-							(releaseTime - state.pendingSingleClickTime) <= kDoubleClickThresholdMs)
-						{
+							(releaseTime - state.pendingSingleClickTime) <= kDoubleClickThresholdMs) {
 							InputEventBuffer::push(key, InputEventType::DoubleClick, pin);
 							state.pendingSingleClick = false;
-						} else
-						{
+						} else {
 							state.pendingSingleClick = true;
 							state.pendingSingleClickTime = releaseTime;
 						}
@@ -362,27 +355,22 @@ void loop1() {
 					state.holdEventSent = false;
 				}
 			}
-		} else
-		{
+		} else {
 			state.debounceCounter = 0;
 		}
 
-		if (state.isPressed && !state.holdEventSent)
-		{
+		if (state.isPressed && !state.holdEventSent) {
 			const uint32_t heldDuration = millis() - state.pressStartMs;
-			if (heldDuration >= kHoldThresholdMs)
-			{
+			if (heldDuration >= kHoldThresholdMs) {
 				InputEventBuffer::push(key, InputEventType::Hold, pin);
 				state.holdEventSent = true;
 				state.pendingSingleClick = false;
 			}
 		}
 
-		if (!state.isPressed && state.pendingSingleClick)
-		{
+		if (!state.isPressed && state.pendingSingleClick) {
 			const uint32_t elapsed = millis() - state.pendingSingleClickTime;
-			if (elapsed > kDoubleClickThresholdMs)
-			{
+			if (elapsed > kDoubleClickThresholdMs) {
 				InputEventBuffer::push(key, InputEventType::Pressed, pin);
 				state.pendingSingleClick = false;
 			}
