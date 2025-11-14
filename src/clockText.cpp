@@ -43,7 +43,7 @@ void setClockTextColorMode(CRGB color) {
 	g_setModeColor = color;
 }
 
-void getTime(uint8_t hours, uint8_t minutes, NumberDisplayMode mode, std::string& text, CRGB* colors) {
+void prepareTimeString(uint8_t hours, uint8_t minutes, NumberDisplayMode mode, std::string& text, CRGB* colors) {
 	switch (mode) {
 		case NumberDisplayMode::Hour12: {
 			char buffer[6];
