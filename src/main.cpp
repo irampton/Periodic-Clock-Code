@@ -179,7 +179,7 @@ void loop() {
 				}
 				break;
 			case InputEventType::Hold:
-				switch (event.type) {
+				switch (event.key) {
 					case InputKey::AuxButton0:
 						break;
 					case InputKey::AuxButton1:
@@ -223,7 +223,7 @@ void loop() {
 			const bool modeChanged = (number_display_mode != displayedMode);
 
 			if (!displayInitialised || timeChanged || modeChanged) {
-				getTime(hours, minutes, number_display_mode, clock_text, clock_colors);
+				prepareTimeString(hours, minutes, number_display_mode, clock_text, clock_colors);
 
 				display->write_string(clock_text, clock_colors, true);
 				displayedHours = hours;
@@ -250,7 +250,7 @@ void loop() {
 			const bool modeChanged = usingHours != displayedUsingHours;
 
 			if (!displayInitialised || timeChanged || modeChanged) {
-				getTime(displayHigh, displayLow, number_display_mode, clock_text, clock_colors);
+				prepareTimeString(displayHigh, displayLow, number_display_mode, clock_text, clock_colors);
 				display->write_string(clock_text, clock_colors, true);
 				displayedHigh = displayHigh;
 				displayedLow = displayLow;

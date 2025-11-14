@@ -14,4 +14,4 @@ enum class NumberDisplayMode {
 	Periodic,
 };
 
-void getTime(uint8_t hours, uint8_t minutes, NumberDisplayMode mode, std::string& text, CRGB* colors);
+void prepareTimeString(uint8_t hours, uint8_t minutes, NumberDisplayMode mode, std::string& text, CRGB* colors);
