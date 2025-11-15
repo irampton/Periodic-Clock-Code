@@ -9,7 +9,7 @@
 #include "LED_Wrapper.h"
 #include "font.h"
 
-#define TARGET_DELAY_BETWEEN_FRAMES 16
+#define TARGET_DELAY_BETWEEN_FRAMES 12
 
 class Display {
 public:
@@ -35,6 +35,7 @@ private:
 	std::vector<CRGB> fadeFromFrame;
 	std::vector<uint8_t> scrollColumns;
 	std::vector<CRGB> scrollColumnColors;
+	std::vector<CRGB> scrollBlendFrame;
 	float scrollPosition;
 	bool scrollActive;
 	uint32_t lastScrollUpdateMillis;

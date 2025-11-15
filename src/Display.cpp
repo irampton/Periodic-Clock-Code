@@ -8,9 +8,9 @@
 #define BRIGHTNESS_STEP 8
 #define INITIAL_BRIGHTNESS 64
 #define FADE_DURATION_MS 250
-#define SCROLL_SPEED_PIXELS_PER_SECOND 25.0f
-#define SCROLL_LOOP_DELAY_MULTIPLIER 10.0f
-#define SCROLL_WRAP_SPACER_COLUMNS 3
+#define SCROLL_SPEED_PIXELS_PER_SECOND 35.0f
+#define SCROLL_LOOP_DELAY_MULTIPLIER 15.0f
+#define SCROLL_WRAP_SPACER_COLUMNS 27
 
 Display::Display(int rows, int cols, int led_pin)
 	: height(rows),
@@ -400,8 +400,28 @@ void Display::updateScrollTarget() {
 	}
 
 	const size_t columnCount = scrollColumns.size();
-	const size_t baseColumn = columnCount == 0 ? 0 : static_cast<size_t>(scrollPosition) % columnCount;
+	const float integralPart = std::floor(scrollPosition);
+	const size_t baseColumn = columnCount == 0 ? 0 : static_cast<size_t>(integralPart) % columnCount;
 	renderColumnsToFrame(scrollColumns, scrollColumnColors, baseColumn, true, targetFrame);
+
+	const float fractional = std::clamp(scrollPosition - integralPart, 0.0f, 1.0f);
+	if (fractional <= 0.0f || columnCount == 0) {
+		return;
+	}
+
+	if (scrollBlendFrame.size() != targetFrame.size()) {
+		scrollBlendFrame.assign(targetFrame.size(), CRGB::Black);
+	}
+
+	const size_t nextColumn = (baseColumn + 1) % columnCount;
+	renderColumnsToFrame(scrollColumns, scrollColumnColors, nextColumn, true, scrollBlendFrame);
+
+#ifdef FADE_BETWEEN_FRAMES
+	const size_t totalPixels = targetFrame.size();
+	for (size_t idx = 0; idx < totalPixels; ++idx) {
+		targetFrame[idx] = lerpColor(targetFrame[idx], scrollBlendFrame[idx], fractional);
+	}
+#endif
 }
 
 bool Display::advanceScrollPosition(float deltaSeconds) {
@@ -438,6 +458,7 @@ void Display::disableScroll() {
 	scrollPosition = 0.0f;
 	scrollColumns.clear();
 	scrollColumnColors.clear();
+	scrollBlendFrame.clear();
 	lastScrollUpdateMillis = 0;
 	scrollPauseUntilMillis = 0;
 }
