@@ -287,7 +287,7 @@ void loop() {
 
 	// Update the display @ up to 60 frames per second
 	display->tick();
-	delay(16 - (millis() - startTime));
+	delay(TARGET_DELAY_BETWEEN_FRAMES - (millis() - startTime));
 }
 
 // Button Inputs
