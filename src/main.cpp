@@ -160,6 +160,9 @@ void loop() {
 								Serial.println("Clock mode: periodic");
 								break;
 						}
+						if (current_mode == CurrentMode::stopwatch) {
+							displayInitialised = false;
+						}
 						break;
 					case InputKey::AuxButton1:
 						switch (current_mode) {
@@ -216,13 +219,16 @@ void loop() {
 			static int displayedMinutes = -1;
 			static NumberDisplayMode displayedMode = NumberDisplayMode::Periodic;
 
-			const int hours = myRTC.getHours();
+			int hours = myRTC.getHours();
 			const int minutes = myRTC.getMinutes();
 
 			const bool timeChanged = (hours != displayedHours) || (minutes != displayedMinutes);
 			const bool modeChanged = (number_display_mode != displayedMode);
 
 			if (!displayInitialised || timeChanged || modeChanged) {
+				if (number_display_mode == NumberDisplayMode::Hour12 && hours == 0) {
+					hours = 12;
+				}
 				prepareTimeString(hours, minutes, number_display_mode, clock_text, clock_colors);
 
 				display->write_string(clock_text, clock_colors, true);
@@ -288,7 +294,7 @@ void loop() {
 constexpr uint8_t kButtonPins[] = {2, 3, 4, 5, 6};
 constexpr size_t kButtonCount = sizeof(kButtonPins) / sizeof(kButtonPins[0]);
 constexpr uint8_t kDebounceLimit = 3;
-constexpr uint32_t kDoubleClickThresholdMs = 200;
+constexpr uint32_t kDoubleClickThresholdMs = 300;
 constexpr uint32_t kHoldThresholdMs = 800;
 
 struct ButtonState {

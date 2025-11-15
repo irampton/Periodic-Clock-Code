@@ -9,6 +9,7 @@ LED_Wrapper::LED_Wrapper(int pin, int numLEDs) {
 void LED_Wrapper::init() {
 	FastLED.addLeds<NEOPIXEL, 15>(leds, numLEDs); // Initialize the LED strip
 	FastLED.setBrightness(255); // Set the maximum brightness
+	FastLED.setCorrection(CRGB(220,255,128));
 }
 
 void LED_Wrapper::clearAll() {

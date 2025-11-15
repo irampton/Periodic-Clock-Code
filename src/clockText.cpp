@@ -9,12 +9,12 @@ namespace {
 	ClockColorMode g_clockColorMode = ClockColorMode::Colorful;
 	CRGB g_setModeColor = CRGB::Blue2;
 
-	constexpr uint8_t kDigitSaturation = static_cast<uint8_t>(0.7 * 255);
-	constexpr uint8_t kDigitValue = 128;
+	constexpr uint8_t kDigitSaturation = static_cast<uint8_t>(0.8 * 255);
+	constexpr uint8_t kDigitValue = 192;
 
 	CRGB colorForDigit(char ch) {
 		uint8_t digit = static_cast<uint8_t>(ch - '0');
-		uint8_t hue = static_cast<uint8_t>(digit * 9);
+		uint8_t hue = static_cast<uint8_t>(digit * 25);
 		return CHSV(hue, kDigitSaturation, kDigitValue);
 	}
 
@@ -46,12 +46,16 @@ void setClockTextColorMode(CRGB color) {
 void prepareTimeString(uint8_t hours, uint8_t minutes, NumberDisplayMode mode, std::string& text, CRGB* colors) {
 	switch (mode) {
 		case NumberDisplayMode::Hour12: {
-			char buffer[6];
-			int hour12 = hours % 12;
-			if (hour12 == 0) {
-				hour12 = 12;
-			}
-			std::snprintf(buffer, sizeof(buffer), "%02d:%02d", hour12, minutes);
+			char buffer[6];   // 5 chars + null
+
+			// Leading space if 1-digit hour, otherwise tens digit
+			buffer[0] = (hours < 10) ? ' ' : char('0' + (hours / 10));
+			buffer[1] = char('0' + (hours % 10));
+			buffer[2] = ':';
+			buffer[3] = char('0' + (minutes / 10));
+			buffer[4] = char('0' + (minutes % 10));
+			buffer[5] = '\0';
+
 			text.assign(buffer);
 			applyColors(text, colors);
 			break;
