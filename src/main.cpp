@@ -287,7 +287,11 @@ void loop() {
 
 	// Update the display @ up to 60 frames per second
 	display->tick();
-	delay(TARGET_DELAY_BETWEEN_FRAMES - (millis() - startTime));
+	const uint32_t elapsed = millis() - startTime;
+	const uint32_t frameDelay = (elapsed < TARGET_DELAY_BETWEEN_FRAMES)
+		? (TARGET_DELAY_BETWEEN_FRAMES - elapsed)
+		: 1;
+	delay(frameDelay);
 }
 
 // Button Inputs
