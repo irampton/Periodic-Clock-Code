@@ -9,6 +9,7 @@
 #include "serial.h"
 #include "InputEventBuffer.h"
 #include "clockText.h"
+#include "SettingsCarousel.h"
 
 #define ROWS 7
 #define COLUMNS 27
@@ -64,6 +65,8 @@ void setup() {
 	Serial.begin(9600);
 
 	stopwatch.init(myRTC);
+
+	initSettingsCarousel(display, clockTextFormatter);
 }
 
 std::string clock_text;
@@ -71,6 +74,7 @@ CRGB clock_colors[CLOCK_LENGTH];
 
 void loop() {
 	uint32_t startTime = millis();
+	Carousel& settingsCarousel = getSettingsCarousel();
 
 	// Check for anything over the serial port
 	// This is used to set the time programmatically
@@ -132,13 +136,17 @@ void loop() {
 			case InputEventType::Pressed:
 				switch (event.key) {
 					case InputKey::RotaryCW:
-						if (event.type == InputEventType::Pressed) {
+						if (current_mode == CurrentMode::settings) {
+							settingsCarousel.rotateOption(1);
+						} else if (event.type == InputEventType::Pressed) {
 							display->incrementBrightness();
 							Serial.println("RotaryCW");
 						}
 						break;
 					case InputKey::RotaryCCW:
-						if (event.type == InputEventType::Pressed) {
+						if (current_mode == CurrentMode::settings) {
+							settingsCarousel.rotateOption(-1);
+						} else if (event.type == InputEventType::Pressed) {
 							display->decrementBrightness();
 							Serial.println("RotaryCCW");
 						}
@@ -173,6 +181,9 @@ void loop() {
 					case InputKey::AuxButton3:
 						break;
 					case InputKey::AuxButton4:
+						if (current_mode == CurrentMode::settings) {
+							settingsCarousel.nextItem();
+						}
 						break;
 				}
 				break;
@@ -272,7 +283,8 @@ void loop() {
 			break;
 		case CurrentMode::settings:
 			if (!displayInitialised) {
-				display->write_string("Settings", CRGB::Red2, true);
+				settingsCarousel.syncCurrentIndexFromProvider();
+				settingsCarousel.showCurrentOption(true);
 				displayInitialised = true;
 			}
 			break;
