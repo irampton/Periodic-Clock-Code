@@ -20,6 +20,7 @@ Rotary* r1 = new Rotary(9, 10, 8);
 DS3231_Wrapper myRTC;
 Stopwatch stopwatch;
 Display* display = new Display(ROWS, COLUMNS, LED_PIN);
+ClockText clockTextFormatter();
 
 enum class CurrentMode {
 	clock,
@@ -148,16 +149,10 @@ void loop() {
 					case InputKey::AuxButton0:
 						switch (number_display_mode) {
 							case NumberDisplayMode::Periodic:
-								number_display_mode = NumberDisplayMode::Hour12;
-								Serial.println("Clock mode: 12-hour");
+								number_display_mode = NumberDisplayMode::Numeral;
 								break;
-							case NumberDisplayMode::Hour12:
-								number_display_mode = NumberDisplayMode::Hour24;
-								Serial.println("Clock mode: 24-hour");
-								break;
-							case NumberDisplayMode::Hour24:
+							case NumberDisplayMode::Numeral:
 								number_display_mode = NumberDisplayMode::Periodic;
-								Serial.println("Clock mode: periodic");
 								break;
 						}
 						break;
@@ -187,7 +182,7 @@ void loop() {
 							case CurrentMode::stopwatch:
 								stopwatch.stop();
 								stopwatch.reset();
-							break;
+								break;
 							default:
 								break;
 						}
@@ -209,6 +204,7 @@ void loop() {
 		Serial.println("Input queue overflow");
 	}
 
+	// Update the screen, if necessary
 	switch (current_mode) {
 		case CurrentMode::clock: {
 			// Decide if we need to update the clock, then update it
@@ -223,7 +219,7 @@ void loop() {
 			const bool modeChanged = (number_display_mode != displayedMode);
 
 			if (!displayInitialised || timeChanged || modeChanged) {
-				prepareTimeString(hours, minutes, number_display_mode, clock_text, clock_colors);
+				clockTextFormatter.prepareTimeString(hours, minutes, number_display_mode, clock_text, clock_colors);
 
 				display->write_string(clock_text, clock_colors, true);
 				displayedHours = hours;
@@ -250,7 +246,7 @@ void loop() {
 			const bool modeChanged = usingHours != displayedUsingHours;
 
 			if (!displayInitialised || timeChanged || modeChanged) {
-				prepareTimeString(displayHigh, displayLow, number_display_mode, clock_text, clock_colors);
+				clockTextFormatter.prepareTimeString(displayHigh, displayLow, number_display_mode, clock_text, clock_colors);
 				display->write_string(clock_text, clock_colors, true);
 				displayedHigh = displayHigh;
 				displayedLow = displayLow;

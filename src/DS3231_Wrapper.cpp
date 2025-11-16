@@ -38,6 +38,9 @@ int DS3231_Wrapper::getSeconds() {
 }
 
 void DS3231_Wrapper::setHours(uint8_t hour) {
+	// set the clock in 24 hour mode
+	rtc.setClockMode(false);
+	// then set the hour
 	if (hour > 23) {
 		return;
 	}
