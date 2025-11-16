@@ -12,7 +12,7 @@ const cOut = `// This is an automatically genrated .cpp file
 // Types:
 ${Object.keys(types).map((t, i) => `// ${(i + 1).toString().padStart(2, '0')}:   ${t}`).join("\n")}
 
-const std::string pTable[${pTable.length + 1}] = {" ∅", ${pTable.map((e, i) => `${i % 10 ? " " : "\n"}"${e.Symbol}"`).toString()}
+const std::string pTable[${pTable.length + 1}] = {"00", ${pTable.map((e, i) => `${i % 10 ? " " : "\n"}"${e.Symbol}"`).toString()}
 };
 
 const uint8_t pTableColor[${pTable.length + 1}] = {0, ${pTable.map((e, i) => `${i % 10 ? " " : "\n"}${types[e.Details["Metal-Type"]]}`).toString()}

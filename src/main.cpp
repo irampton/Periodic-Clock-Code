@@ -155,6 +155,9 @@ void loop() {
 								number_display_mode = NumberDisplayMode::Periodic;
 								break;
 						}
+						if (current_mode == CurrentMode::stopwatch) {
+							displayInitialised = false;
+						}
 						break;
 					case InputKey::AuxButton1:
 						switch (current_mode) {
@@ -212,7 +215,7 @@ void loop() {
 			static int displayedMinutes = -1;
 			static NumberDisplayMode displayedMode = NumberDisplayMode::Periodic;
 
-			const int hours = myRTC.getHours();
+			int hours = myRTC.getHours();
 			const int minutes = myRTC.getMinutes();
 
 			const bool timeChanged = (hours != displayedHours) || (minutes != displayedMinutes);
@@ -220,6 +223,7 @@ void loop() {
 
 			if (!displayInitialised || timeChanged || modeChanged) {
 				clockTextFormatter->prepareTimeString(hours, minutes, number_display_mode, clock_text, clock_colors);
+				prepareTimeString(hours, minutes, number_display_mode, clock_text, clock_colors);
 
 				display->write_string(clock_text, clock_colors, true);
 				displayedHours = hours;
@@ -277,14 +281,18 @@ void loop() {
 
 	// Update the display @ up to 60 frames per second
 	display->tick();
-	delay(16 - (millis() - startTime));
+	const uint32_t elapsed = millis() - startTime;
+	const uint32_t frameDelay = (elapsed < TARGET_DELAY_BETWEEN_FRAMES)
+		? (TARGET_DELAY_BETWEEN_FRAMES - elapsed)
+		: 1;
+	delay(frameDelay);
 }
 
 // Button Inputs
 constexpr uint8_t kButtonPins[] = {2, 3, 4, 5, 6};
 constexpr size_t kButtonCount = sizeof(kButtonPins) / sizeof(kButtonPins[0]);
 constexpr uint8_t kDebounceLimit = 3;
-constexpr uint32_t kDoubleClickThresholdMs = 200;
+constexpr uint32_t kDoubleClickThresholdMs = 300;
 constexpr uint32_t kHoldThresholdMs = 800;
 
 struct ButtonState {

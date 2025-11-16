@@ -3,12 +3,14 @@
 #include <Arduino.h>
 #include <limits>
 #include <utility>
+#include <cmath>
 
-#define BRIGHTNESS_STEP 16
+#define BRIGHTNESS_STEP 8
 #define INITIAL_BRIGHTNESS 64
-#define FADE_DURATION_MS 1000
-#define SCROLL_STEP_INTERVAL_MS 100
-#define SCROLL_WRAP_SPACER_COLUMNS 3
+#define FADE_DURATION_MS 250
+#define SCROLL_SPEED_PIXELS_PER_SECOND 35.0f
+#define SCROLL_LOOP_DELAY_MULTIPLIER 15.0f
+#define SCROLL_WRAP_SPACER_COLUMNS 27
 
 Display::Display(int rows, int cols, int led_pin)
 	: height(rows),
@@ -18,9 +20,10 @@ Display::Display(int rows, int cols, int led_pin)
 	  fadeActive(false),
 	  fadeStartMillis(0),
 	  driver(led_pin, rows * cols),
-	  scrollOffset(0),
+	  scrollPosition(0.0f),
 	  scrollActive(false),
-	  lastScrollUpdateMillis(0) {
+	  lastScrollUpdateMillis(0),
+	  scrollPauseUntilMillis(0) {
 	const size_t totalPixels = static_cast<size_t>(height) * static_cast<size_t>(width);
 	displayedFrame.assign(totalPixels, CRGB::Black);
 	targetFrame = displayedFrame;
@@ -92,10 +95,23 @@ void Display::tick() {
 			disableScroll();
 		} else {
 			const uint32_t now = millis();
-			if (now - lastScrollUpdateMillis >= SCROLL_STEP_INTERVAL_MS) {
-				advanceScrollOffset();
-				updateScrollTarget();
+			if (lastScrollUpdateMillis == 0) {
 				lastScrollUpdateMillis = now;
+			}
+			if (scrollPauseUntilMillis != 0 && now < scrollPauseUntilMillis) {
+				lastScrollUpdateMillis = now;
+			} else {
+				const float deltaSeconds = static_cast<float>(now - lastScrollUpdateMillis) / 1000.0f;
+				if (deltaSeconds > 0.0f) {
+					lastScrollUpdateMillis = now;
+					const bool wrapped = advanceScrollPosition(deltaSeconds);
+					updateScrollTarget();
+					if (wrapped) {
+						scrollPauseUntilMillis = now + scrollPauseDurationMs();
+					} else {
+						scrollPauseUntilMillis = 0;
+					}
+				}
 			}
 		}
 	} else if (newData) {
@@ -147,9 +163,11 @@ void Display::write_string(const std::string& text, CRGB* colors, bool fade) {
 		scrollColumns.push_back(0x00);
 		scrollColumnColors.push_back(CRGB::Black);
 	}
-	scrollOffset = 0;
+	scrollPosition = 0.0f;
 	scrollActive = true;
-	lastScrollUpdateMillis = millis();
+	const uint32_t now = millis();
+	lastScrollUpdateMillis = now;
+	scrollPauseUntilMillis = now + scrollPauseDurationMs();
 	updateScrollTarget();
 
 	fade = fade && (FADE_DURATION_MS > 0);
@@ -380,21 +398,67 @@ void Display::updateScrollTarget() {
 	if (!scrollActive || scrollColumns.empty()) {
 		return;
 	}
-	renderColumnsToFrame(scrollColumns, scrollColumnColors, scrollOffset, true, targetFrame);
-}
 
-void Display::advanceScrollOffset() {
-	if (scrollColumns.empty()) {
-		scrollOffset = 0;
+	const size_t columnCount = scrollColumns.size();
+	const float integralPart = std::floor(scrollPosition);
+	const size_t baseColumn = columnCount == 0 ? 0 : static_cast<size_t>(integralPart) % columnCount;
+	renderColumnsToFrame(scrollColumns, scrollColumnColors, baseColumn, true, targetFrame);
+
+	const float fractional = std::clamp(scrollPosition - integralPart, 0.0f, 1.0f);
+	if (fractional <= 0.0f || columnCount == 0) {
 		return;
 	}
-	scrollOffset = (scrollOffset + 1) % scrollColumns.size();
+
+	if (scrollBlendFrame.size() != targetFrame.size()) {
+		scrollBlendFrame.assign(targetFrame.size(), CRGB::Black);
+	}
+
+	const size_t nextColumn = (baseColumn + 1) % columnCount;
+	renderColumnsToFrame(scrollColumns, scrollColumnColors, nextColumn, true, scrollBlendFrame);
+
+#ifdef FADE_BETWEEN_FRAMES
+	const size_t totalPixels = targetFrame.size();
+	for (size_t idx = 0; idx < totalPixels; ++idx) {
+		targetFrame[idx] = lerpColor(targetFrame[idx], scrollBlendFrame[idx], fractional);
+	}
+#endif
+}
+
+bool Display::advanceScrollPosition(float deltaSeconds) {
+	if (scrollColumns.empty() || deltaSeconds <= 0.0f) {
+		return false;
+	}
+
+	const float speed = std::max(SCROLL_SPEED_PIXELS_PER_SECOND, 1.0f);
+	scrollPosition += speed * deltaSeconds;
+	const float totalColumns = static_cast<float>(scrollColumns.size());
+
+	if (totalColumns <= 0.0f) {
+		scrollPosition = 0.0f;
+		return false;
+	}
+
+	if (scrollPosition >= totalColumns) {
+		scrollPosition = 0.0f;
+		return true;
+	}
+	return false;
+}
+
+uint32_t Display::scrollPauseDurationMs() const {
+	const float speed = std::max(SCROLL_SPEED_PIXELS_PER_SECOND, 1.0f);
+	const float pixelDurationMs = 1000.0f / speed;
+	const float requestedDelay = pixelDurationMs * SCROLL_LOOP_DELAY_MULTIPLIER;
+	const float clampedDelay = std::max(requestedDelay, 1.0f);
+	return static_cast<uint32_t>(clampedDelay);
 }
 
 void Display::disableScroll() {
 	scrollActive = false;
-	scrollOffset = 0;
+	scrollPosition = 0.0f;
 	scrollColumns.clear();
 	scrollColumnColors.clear();
+	scrollBlendFrame.clear();
 	lastScrollUpdateMillis = 0;
+	scrollPauseUntilMillis = 0;
 }
