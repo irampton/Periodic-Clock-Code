@@ -20,7 +20,7 @@ Rotary* r1 = new Rotary(9, 10, 8);
 DS3231_Wrapper myRTC;
 Stopwatch stopwatch;
 Display* display = new Display(ROWS, COLUMNS, LED_PIN);
-ClockText clockTextFormatter();
+ClockText* clockTextFormatter = new ClockText();
 
 enum class CurrentMode {
 	clock,
@@ -219,7 +219,7 @@ void loop() {
 			const bool modeChanged = (number_display_mode != displayedMode);
 
 			if (!displayInitialised || timeChanged || modeChanged) {
-				clockTextFormatter.prepareTimeString(hours, minutes, number_display_mode, clock_text, clock_colors);
+				clockTextFormatter->prepareTimeString(hours, minutes, number_display_mode, clock_text, clock_colors);
 
 				display->write_string(clock_text, clock_colors, true);
 				displayedHours = hours;
@@ -246,7 +246,7 @@ void loop() {
 			const bool modeChanged = usingHours != displayedUsingHours;
 
 			if (!displayInitialised || timeChanged || modeChanged) {
-				clockTextFormatter.prepareTimeString(displayHigh, displayLow, number_display_mode, clock_text, clock_colors);
+				clockTextFormatter->prepareTimeString(displayHigh, displayLow, number_display_mode, clock_text, clock_colors);
 				display->write_string(clock_text, clock_colors, true);
 				displayedHigh = displayHigh;
 				displayedLow = displayLow;
