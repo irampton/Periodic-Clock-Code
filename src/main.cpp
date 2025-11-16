@@ -223,7 +223,6 @@ void loop() {
 
 			if (!displayInitialised || timeChanged || modeChanged) {
 				clockTextFormatter->prepareTimeString(hours, minutes, number_display_mode, clock_text, clock_colors);
-				prepareTimeString(hours, minutes, number_display_mode, clock_text, clock_colors);
 
 				display->write_string(clock_text, clock_colors, true);
 				displayedHours = hours;
