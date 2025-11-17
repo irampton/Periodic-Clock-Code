@@ -29,7 +29,8 @@ namespace {
 }
 
 DS3231_Wrapper::DS3231_Wrapper()
-	: timezoneHourOffset(0), timezoneMinuteOffset(0), dstEnabled(false) {
+	: cachedHour(-1), cachedMinute(-1),lastCachedMinute(-1), minuteAtLastHourCalculation(-1), lastMinuteReadMs(0),
+	  timezoneHourOffset(0), timezoneMinuteOffset(0), dstEnabled(false) {
 }
 
 void DS3231_Wrapper::printTime() {
@@ -46,6 +47,29 @@ void DS3231_Wrapper::printTime() {
 	Serial.print(":");
 	if (second < 10) Serial.print("0");
 	Serial.println(second);
+}
+
+DS3231_Wrapper::HoursMinutes DS3231_Wrapper::getCachedHoursMinutes() {
+	const uint32_t nowMs = millis();
+	constexpr uint32_t MINUTE_REFRESH_WINDOW_MS = 500; // Read minute once or twice a second
+
+	// Longer than 30 minutes between calls
+	const bool long_wait_between_calls = nowMs - lastMinuteReadMs > 1000 * 60 * 29;
+
+	if (cachedMinute < 0 || nowMs - lastMinuteReadMs >= MINUTE_REFRESH_WINDOW_MS) {
+		lastCachedMinute = cachedMinute;
+		cachedMinute = rtc.getMinute();
+		lastMinuteReadMs = nowMs;
+	}
+
+
+	if (cachedHour < 0 || cachedMinute < lastCachedMinute || long_wait_between_calls) {
+		cachedHour = getHours();
+		minuteAtLastHourCalculation = cachedMinute;
+		lastCachedMinute = cachedMinute;
+	}
+
+	return {cachedHour, cachedMinute};
 }
 
 int DS3231_Wrapper::getHours() {

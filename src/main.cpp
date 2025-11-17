@@ -226,8 +226,9 @@ void loop() {
 			static int displayedMinutes = -1;
 			static NumberDisplayMode displayedMode = NumberDisplayMode::Periodic;
 
-			int hours = myRTC.getHours();
-			const int minutes = myRTC.getMinutes();
+			const auto currentTime = myRTC.getCachedHoursMinutes();
+			int hours = currentTime.hour;
+			const int minutes = currentTime.minute;
 
 			const bool timeChanged = (hours != displayedHours) || (minutes != displayedMinutes);
 			const bool modeChanged = (number_display_mode != displayedMode);
