@@ -61,3 +61,7 @@ void Carousel::syncCurrentIndexFromProvider() {
 		item.currentIndex = item.indexProvider() % item.optionCount;
 	}
 }
+
+void Carousel::resetCarousel(){
+  currentItemIndex_ = 0;
+}

@@ -283,6 +283,7 @@ void loop() {
 			break;
 		case CurrentMode::settings:
 			if (!displayInitialised) {
+				settingsCarousel.resetCarousel();
 				settingsCarousel.syncCurrentIndexFromProvider();
 				settingsCarousel.showCurrentOption(true);
 				displayInitialised = true;

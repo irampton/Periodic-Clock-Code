@@ -27,6 +27,7 @@ public:
 	void rotateOption(int direction);
 	void showCurrentOption(bool fade = true) const;
 	void syncCurrentIndexFromProvider();
+	void resetCarousel();
 
 	CarouselItem& currentItem();
 	const CarouselItem& currentItem() const;
