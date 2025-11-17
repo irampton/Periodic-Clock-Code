@@ -7,7 +7,7 @@ namespace {
 	constexpr int8_t MAX_TIMEZONE_HOURS = 14; // UTC+14
 
 	constexpr uint8_t daysInMonth(uint16_t year, uint8_t month) {
-		static const uint8_t days[] = {31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
+		const uint8_t days[] = {31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
 		if (month == 0 || month > 12) return 30;
 		uint8_t base = days[month - 1];
 		// leap year check for February
@@ -20,7 +20,7 @@ namespace {
 
 	constexpr uint8_t weekday(uint16_t year, uint8_t month, uint8_t day) {
 		// Sakamoto's algorithm; returns 0=Sunday .. 6=Saturday
-		static const uint8_t t[] = {0, 3, 2, 5, 0, 3, 5, 1, 4, 6, 2, 4};
+		const uint8_t t[] = {0, 3, 2, 5, 0, 3, 5, 1, 4, 6, 2, 4};
 		if (month < 3) {
 			--year;
 		}
