@@ -4,6 +4,21 @@ function sleep(ms) {
     return new Promise(resolve => setTimeout(resolve, ms));
 }
 
+function getTimezoneInfo() {
+    const now = new Date();
+    const january = new Date(now.getFullYear(), 0, 1);
+    const july = new Date(now.getFullYear(), 6, 1);
+
+    // JavaScript reports offsets in minutes behind UTC; convert to minutes east of UTC
+    const standardOffset = Math.max(january.getTimezoneOffset(), july.getTimezoneOffset());
+    const usesDst = january.getTimezoneOffset() !== july.getTimezoneOffset();
+
+    return {
+        offsetMinutes: -standardOffset,
+        usesDst,
+    };
+}
+
 function sendToAllPorts() {
     Serial.scan(async (ports) => {
         if (!Array.isArray(ports) || ports.length === 0) {
@@ -26,21 +41,12 @@ function sendToAllPorts() {
                 await Serial.connect(port.path);
                 console.log(`Connected to ${port.path}`);
 
-                const now = new Date();
-                const hour = now.getHours();
-                const min  = now.getMinutes();
-                const sec  = now.getSeconds();
+                const epochSeconds = Math.floor(Date.now() / 1000);
+                const { offsetMinutes, usesDst } = getTimezoneInfo();
+                const hourOffset = Math.trunc(offsetMinutes / 60);
 
-                console.log(hour);
-                Serial.send(`set hour ${hour}`);
-
-                console.log(min);
-                Serial.send(`set min ${min}`);
-
-                console.log(sec);
-                Serial.send(`set sec ${sec}`);
-
-                Serial.send('hello world');
+                console.log(`Setting time with epoch=${epochSeconds}, hour offset=${hourOffset}, dst=${usesDst}`);
+                Serial.send(`set time ${epochSeconds} ${hourOffset} ${usesDst ? 1 : 0}`);
 
                 // Give it some time to transmit / process if needed
                 await sleep(1000);
