@@ -1,5 +1,4 @@
-#ifndef RP2040_DS3231_WRAPPER_H
-#define RP2040_DS3231_WRAPPER_H
+#pragma once
 
 #include <Arduino.h>
 #include <Wire.h>
@@ -20,6 +19,7 @@ public:
 	int getHours(); // Getter for hours
 	int getMinutes(); // Getter for minutes
 	int getSeconds(); // Getter for seconds
+	uint32_t getEpoch(); // Getter for Unix time (seconds since 1970-01-01)
 	void setTime(time_t epochSeconds, int8_t timezoneHourOffset, bool dstEnabled);
 	void setTimezoneOffset(int8_t timezoneHourOffset);
 	int8_t getTimezoneHourOffset() const;
@@ -39,5 +39,3 @@ private:
 	int8_t timezoneMinuteOffset; // Minute offset from UTC
 	bool dstEnabled;
 };
-
-#endif //RP2040_DS3231_WRAPPER_H

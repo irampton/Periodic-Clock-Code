@@ -161,6 +161,11 @@ int DS3231_Wrapper::getSeconds() {
 	return rtc.getSecond();
 }
 
+uint32_t DS3231_Wrapper::getEpoch() {
+	const DateTime now = RTClib::now();
+	return now.unixtime();
+}
+
 void DS3231_Wrapper::setTime(time_t epochSeconds, int8_t timezoneHour, bool dstEnabledFlag) {
 	if (timezoneHour < MIN_TIMEZONE_HOURS) {
 		timezoneHour = MIN_TIMEZONE_HOURS;
