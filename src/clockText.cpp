@@ -1,12 +1,14 @@
 #include "clockText.h"
 
-namespace {
+namespace
+{
 	constexpr uint8_t kDigitSaturation = static_cast<uint8_t>(0.7 * 255);
 	constexpr uint8_t kDigitValue = 128;
 }
 
 ClockText::ClockText(TimeMode timeMode)
-	: timeMode_(timeMode), colorMode_(ClockColorMode::Colorful), setModeColor_(CRGB::Blue2) {}
+	: timeMode_(timeMode), colorMode_(ClockColorMode::Colorful), setModeColor_(CRGB::Blue2) {
+}
 
 void ClockText::setTimeMode(TimeMode timeMode) {
 	timeMode_ = timeMode;
@@ -55,9 +57,11 @@ void ClockText::formatNumeral(uint8_t hours, uint8_t minutes, std::string& text)
 		if (renderedHour == 0) {
 			renderedHour = 12;
 		}
+		std::snprintf(buffer, sizeof(buffer), "%2d:%02d", renderedHour, minutes);
+	} else {
+		std::snprintf(buffer, sizeof(buffer), "%02d:%02d", hours, minutes);
 	}
 
-	std::snprintf(buffer, sizeof(buffer), "%02d:%02d", renderedHour, minutes);
 	text.assign(buffer);
 }
 
@@ -68,8 +72,12 @@ void ClockText::prepareTimeString(uint8_t hours, uint8_t minutes, NumberDisplayM
 			applyColors(text, colors);
 			break;
 		case NumberDisplayMode::Periodic:
-			convert_to_periodic_time(hours, minutes, text, colors);
+			uint8_t correctedHours = timeMode_ == TimeMode::Hour12
+				                         ? hours % 12 == 0
+					                           ? 12
+					                           : hours % 12
+				                         : hours;
+			convert_to_periodic_time(correctedHours, minutes, text, colors);
 			break;
 	}
 }
-

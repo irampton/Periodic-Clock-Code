@@ -29,7 +29,7 @@ namespace {
 }
 
 DS3231_Wrapper::DS3231_Wrapper()
-	: cachedHour(-1), cachedMinute(-1),lastCachedMinute(-1), minuteAtLastHourCalculation(-1), lastMinuteReadMs(0),
+	: cachedHour(-1), cachedMinute(-1),lastCachedMinute(-1), lastMinuteReadMs(0),
 	  timezoneHourOffset(0), timezoneMinuteOffset(0), dstEnabled(false) {
 }
 
@@ -65,7 +65,6 @@ DS3231_Wrapper::HoursMinutes DS3231_Wrapper::getCachedHoursMinutes() {
 
 	if (cachedHour < 0 || cachedMinute < lastCachedMinute || long_wait_between_calls) {
 		cachedHour = getHours();
-		minuteAtLastHourCalculation = cachedMinute;
 		lastCachedMinute = cachedMinute;
 	}
 
@@ -178,6 +177,9 @@ void DS3231_Wrapper::setTime(time_t epochSeconds, int8_t timezoneHour, bool dstE
 
 	rtc.setClockMode(false); // Force 24-hour mode
 	rtc.setEpoch(epochSeconds, false); // Store RTC as GMT
+	cachedHour = -1;
+	cachedMinute = -1;
+	lastCachedMinute = -1;
 }
 
 void DS3231_Wrapper::setTimezoneOffset(int8_t timezoneHour) {

@@ -31,7 +31,6 @@ private:
 	int cachedHour;
 	int cachedMinute;
 	int lastCachedMinute;
-	int minuteAtLastHourCalculation;
 	uint32_t lastMinuteReadMs;
 
 	DS3231 rtc; // Instance of the DS3231 object
