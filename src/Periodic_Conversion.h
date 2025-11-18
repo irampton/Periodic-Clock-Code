@@ -5,7 +5,17 @@
 #define P_TABLE_SIZE 118
 
 extern const std::string pTable[P_TABLE_SIZE];
-extern const uint8_t pTableColor[P_TABLE_SIZE];
+extern const uint8_t elementFamily[P_TABLE_SIZE];
+extern const uint8_t elementColumn[P_TABLE_SIZE];
+
+enum class ColorMode {
+	MetalType = 0,
+	Column,
+	SolidColor,
+};
+
+inline ColorMode gColorMode = ColorMode::Column;
+inline CRGB gSolidColor = CRGB::Blue;
 
 inline const std::string& get_element_by_number(int aNumber) {
 	if (aNumber < 0 || aNumber >= static_cast<int>(P_TABLE_SIZE)) {
@@ -20,37 +30,88 @@ inline CRGB get_color_by_number(int aNumber) {
 		return CRGB::Black;
 	}
 
-	switch (pTableColor[aNumber]) {
-		// 01:   Reactive nonmetals
-		case 1:
-			return CRGB::Blue2;
-		// 02:   Noble gases
-		case 2:
-			return CRGB::MediumPurple;
-		// 03:   Alkali metals
-		case 3:
-			return CRGB::Red3;
-		// 04:   Alkaline earth metals
-		case 4:
-			return CRGB::Orange2;
-		// 05:   Metalloids
-		case 5:
-			return CRGB::Yellow2;
-		// 06:   Post-transition metals
-		case 6:
-			return CRGB::Green2;
-		// 07:   Transition metals
-		case 7:
-			return CRGB::Cyan2;
-		// 08:   Lanthanoids
-		case 8:
-			return CRGB::Brown;
-		// 09:   Actinoids
-		case 9:
-			return CRGB::Tan;
-		// 10:   N/A
-		case 10:
-			return CRGB::White;
+	switch (gColorMode) {
+		case ColorMode::MetalType:
+			switch (elementFamily[aNumber]) {
+				// 01:   Reactive nonmetals
+				case 1:
+					return CRGB::Blue2;
+				// 02:   Noble gases
+				case 2:
+					return CRGB::MediumPurple;
+				// 03:   Alkali metals
+				case 3:
+					return CRGB::Red3;
+				// 04:   Alkaline earth metals
+				case 4:
+					return CRGB::Orange2;
+				// 05:   Metalloids
+				case 5:
+					return CRGB::Yellow2;
+				// 06:   Post-transition metals
+				case 6:
+					return CRGB::Green2;
+				// 07:   Transition metals
+				case 7:
+					return CRGB::Cyan2;
+				// 08:   Lanthanoids
+				case 8:
+					return CRGB::Brown;
+				// 09:   Actinoids
+				case 9:
+					return CRGB::Tan;
+				// 10:   N/A
+				case 10:
+					return CRGB::White;
+				default:
+					return CRGB::White;
+			}
+		case ColorMode::Column:
+			switch (elementColumn[aNumber]) {
+				// 01:   Hydrogen
+				case 1:
+					return CRGB::Thistle;
+				// 02:   Alkali metals
+				case 2:
+					return CRGB::Yellow;
+				// 03:   Alkaline earth metals
+				case 3:
+					return CRGB::Purple;
+				// 04:   Boron family
+				case 4:
+					return CRGB::Teal;
+				// 05:   Carbon family
+				case 5:
+					return CRGB::Navy;
+				// 06:   Nitrogen family
+				case 6:
+					return CRGB::Orange;
+				// 07:   Oxygen family
+				case 7:
+					return CRGB::Azure;
+				// 08:   Halogens
+				case 8:
+					return CRGB::Green;
+				// 09:   Noble gases
+				case 9:
+					return CRGB::Red;
+				// 10:   Transition metals
+				case 10:
+					return CRGB::Silver;
+				// 11:   Lanthanoids
+				case 11:
+					return CRGB::Brown;
+				// 12:   Actinoids
+				case 12:
+					return CRGB::Pink;
+				// 13:   N/A
+				case 13:
+					return CRGB::White;
+				default:
+					return CRGB::White;
+			}
+		case ColorMode::SolidColor:
+			return gSolidColor;
 		default:
 			return CRGB::White;
 	}

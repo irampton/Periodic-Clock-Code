@@ -1,7 +1,7 @@
-// This is an automatically genrated .cpp file
+// This is an automatically generated .cpp file
 #include "Periodic_Conversion.h"
 
-// Types:
+// Metal types:
 // 01:   Reactive nonmetals
 // 02:   Noble gases
 // 03:   Alkali metals
@@ -12,6 +12,21 @@
 // 08:   Lanthanoids
 // 09:   Actinoids
 // 10:   N/A
+
+// Columns:
+// 01:   Hydrogen
+// 02:   Alkali metals
+// 03:   Alkaline earth metals
+// 04:   Boron family
+// 05:   Carbon family
+// 06:   Nitrogen family
+// 07:   Oxygen family
+// 08:   Halogens
+// 09:   Noble gases
+// 10:   Transition metals
+// 11:   Lanthanoids
+// 12:   Actinoids
+// 13:   N/A
 
 const std::string pTable[118] = {"00", 
 "H", "He", "Li", "Be", "B", "C", "N", "O", "F", "Ne",
@@ -28,7 +43,7 @@ const std::string pTable[118] = {"00",
 "Rg", "Cn", "Nh", "Fl", "Mc", "Lv", "Ts"
 };
 
-const uint8_t pTableColor[118] = {0, 
+const uint8_t elementFamily[118] = {0, 
 1, 2, 3, 4, 5, 1, 1, 1, 1, 2,
 3, 4, 6, 5, 1, 1, 1, 2, 3, 4,
 7, 7, 7, 7, 7, 7, 7, 7, 7, 7,
@@ -41,4 +56,19 @@ const uint8_t pTableColor[118] = {0,
 9, 9, 9, 9, 9, 9, 9, 9, 9, 9,
 9, 9, 9, 7, 7, 7, 7, 7, 10, 10,
 10, 10, 10, 10, 10, 10, 10
+};
+
+const uint8_t elementColumn[118] = {0, 
+1, 9, 2, 3, 4, 5, 6, 7, 8, 9,
+2, 3, 4, 5, 6, 7, 8, 9, 2, 3,
+10, 10, 10, 10, 10, 10, 10, 10, 10, 10,
+10, 10, 10, 10, 10, 10, 10, 10, 10, 10,
+10, 10, 10, 10, 10, 10, 10, 10, 10, 10,
+10, 10, 10, 10, 10, 10, 10, 10, 10, 11,
+11, 11, 11, 11, 11, 11, 11, 11, 11, 11,
+11, 10, 10, 10, 10, 10, 10, 10, 10, 10,
+4, 5, 6, 7, 8, 9, 2, 3, 12, 12,
+12, 12, 12, 12, 12, 12, 12, 12, 12, 12,
+12, 12, 12, 10, 10, 10, 10, 10, 13, 13,
+13, 13, 13, 13, 13, 13, 13
 };
