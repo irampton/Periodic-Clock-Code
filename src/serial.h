@@ -4,6 +4,7 @@
 #include <stdlib.h>
 
 #include "DS3231_Wrapper.h"
+#include "PersistentSettings.h"
 
 inline bool parseLong(const String &value, long &out) {
 	if (value.length() == 0) {
@@ -14,7 +15,7 @@ inline bool parseLong(const String &value, long &out) {
 	return endPtr != nullptr && *endPtr == '\0';
 }
 
-inline void handleSerialCommand(const String &command, DS3231_Wrapper &myRTC) {
+inline void handleSerialCommand(const String &command, DS3231_Wrapper &myRTC, PersistentSettings &settings) {
 	String trimmed = command;
 	trimmed.trim();
 	if (trimmed.length() == 0) {
@@ -69,7 +70,11 @@ inline void handleSerialCommand(const String &command, DS3231_Wrapper &myRTC) {
 		return;
 	}
 
-	myRTC.setTime(static_cast<time_t>(epochLong), static_cast<int8_t>(hourLong), dstLong != 0);
+	const int8_t timezoneHourOffset = static_cast<int8_t>(hourLong);
+	const bool dstEnabled = dstLong != 0;
+	myRTC.setTime(static_cast<time_t>(epochLong), timezoneHourOffset, dstEnabled);
+	settings.setTimezoneOffsetHours(timezoneHourOffset);
+	settings.setDstEnabled(dstEnabled, true /* saveImmediately */);
 
 	Serial.print("Time set to epoch ");
 	Serial.print(epochLong);

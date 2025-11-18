@@ -10,6 +10,7 @@
 #include "InputEventBuffer.h"
 #include "clockText.h"
 #include "SettingsCarousel.h"
+#include "PersistentSettings.h"
 
 #define ROWS 7
 #define COLUMNS 27
@@ -22,6 +23,7 @@ DS3231_Wrapper myRTC;
 Stopwatch stopwatch;
 Display* display = new Display(ROWS, COLUMNS, LED_PIN);
 ClockText* clockTextFormatter = new ClockText();
+PersistentSettings persistentSettings;
 
 enum class CurrentMode {
 	clock,
@@ -64,9 +66,14 @@ void setup() {
 
 	Serial.begin(9600);
 
+	persistentSettings.begin();
+	clockTextFormatter->setTimeMode(persistentSettings.getTimeMode());
+	myRTC.setTimezoneOffset(persistentSettings.getTimezoneOffsetHours());
+	myRTC.setDstEnabled(persistentSettings.isDstEnabled());
+
 	stopwatch.init(myRTC);
 
-	initSettingsCarousel(display, clockTextFormatter);
+	initSettingsCarousel(display, clockTextFormatter, &persistentSettings, &myRTC);
 }
 
 std::string clock_text;
@@ -83,7 +90,7 @@ void loop() {
 		const char incoming = static_cast<char>(Serial.read());
 		if (incoming == '\r' || incoming == '\n') {
 			if (serialBuffer.length() > 0) {
-				handleSerialCommand(serialBuffer, myRTC);
+				handleSerialCommand(serialBuffer, myRTC, persistentSettings);
 				serialBuffer = "";
 			}
 		} else if (serialBuffer.length() < 32) {
@@ -93,6 +100,17 @@ void loop() {
 
 	// Go through any input that loop1() picked up
 	static bool displayInitialised = false;
+	auto switchMode = [&](CurrentMode newMode) {
+		if (current_mode == newMode) {
+			return;
+		}
+		const bool leavingSettings = (current_mode == CurrentMode::settings) && (newMode != CurrentMode::settings);
+		if (leavingSettings) {
+			persistentSettings.saveIfDirty();
+		}
+		current_mode = newMode;
+		displayInitialised = false;
+	};
 	InputEvent event{};
 	while (InputEventBuffer::pop(event)) {
 		switch (event.type) {
@@ -100,34 +118,19 @@ void loop() {
 			case InputEventType::DoubleClick:
 				switch (event.key) {
 					case InputKey::AuxButton0:
-						if (current_mode != CurrentMode::clock) {
-							current_mode = CurrentMode::clock;
-							displayInitialised = false;
-						}
+						switchMode(CurrentMode::clock);
 						break;
 					case InputKey::AuxButton1:
-						if (current_mode != CurrentMode::stopwatch) {
-							current_mode = CurrentMode::stopwatch;
-							displayInitialised = false;
-						}
+						switchMode(CurrentMode::stopwatch);
 						break;
 					case InputKey::AuxButton2:
-						if (current_mode != CurrentMode::timer) {
-							current_mode = CurrentMode::timer;
-							displayInitialised = false;
-						}
+						switchMode(CurrentMode::timer);
 						break;
 					case InputKey::AuxButton3:
-						if (current_mode != CurrentMode::alarm) {
-							current_mode = CurrentMode::alarm;
-							displayInitialised = false;
-						}
+						switchMode(CurrentMode::alarm);
 						break;
 					case InputKey::AuxButton4:
-						if (current_mode != CurrentMode::settings) {
-							current_mode = CurrentMode::settings;
-							displayInitialised = false;
-						}
+						switchMode(CurrentMode::settings);
 						break;
 					default:
 						break;

@@ -190,10 +190,24 @@ void DS3231_Wrapper::setTimezoneOffset(int8_t timezoneHour) {
 	}
 
 	timezoneHourOffset = timezoneHour;
+	cachedHour = -1;
+	cachedMinute = -1;
+	lastCachedMinute = -1;
 }
 
 int8_t DS3231_Wrapper::getTimezoneHourOffset() const {
 	return timezoneHourOffset;
+}
+
+void DS3231_Wrapper::setDstEnabled(bool enabled) {
+	dstEnabled = enabled;
+	cachedHour = -1;
+	cachedMinute = -1;
+	lastCachedMinute = -1;
+}
+
+bool DS3231_Wrapper::getDstEnabled() const {
+	return dstEnabled;
 }
 
 bool DS3231_Wrapper::isDstActive(const tm& localTime) const {

@@ -23,6 +23,8 @@ public:
 	void setTime(time_t epochSeconds, int8_t timezoneHourOffset, bool dstEnabled);
 	void setTimezoneOffset(int8_t timezoneHourOffset);
 	int8_t getTimezoneHourOffset() const;
+	void setDstEnabled(bool enabled);
+	bool getDstEnabled() const;
 
 private:
 	bool isDstActive(const tm &localTime) const;
