@@ -2,8 +2,8 @@
 
 namespace
 {
-	constexpr uint8_t kDigitSaturation = static_cast<uint8_t>(0.7 * 255);
-	constexpr uint8_t kDigitValue = 128;
+	constexpr uint8_t kDigitSaturation = static_cast<uint8_t>(0.9 * 255);
+	constexpr uint8_t kDigitValue = 196;
 }
 
 ClockText::ClockText(TimeMode timeMode)
