@@ -150,8 +150,8 @@ void loop() {
 						break;
 				}
 				break;
-				case InputEventType::Pressed:
-					switch (event.key) {
+			case InputEventType::Pressed:
+				switch (event.key) {
 					case InputKey::RotaryCW:
 						if (current_mode == CurrentMode::settings) {
 							settingsCarousel.rotateOption(1);
@@ -208,13 +208,13 @@ void loop() {
 						break;
 					case InputKey::AuxButton2:
 						break;
-				case InputKey::AuxButton3:
-					if (current_mode == CurrentMode::alarm) {
-						if (alarmController.selectNextAlarm()) {
-							displayInitialised = false;
+					case InputKey::AuxButton3:
+						if (current_mode == CurrentMode::alarm) {
+							if (alarmController.selectNextAlarm()) {
+								displayInitialised = false;
+							}
 						}
-					}
-					break;
+						break;
 					case InputKey::AuxButton4:
 						if (current_mode == CurrentMode::settings) {
 							settingsCarousel.nextItem();
@@ -316,7 +316,7 @@ void loop() {
 				displayInitialised = true;
 			}
 			break;
-		case CurrentMode::alarm:
+		case CurrentMode::alarm: {
 			static uint8_t displayedAlarmHours = 255;
 			static uint8_t displayedAlarmMinutes = 255;
 			static NumberDisplayMode displayedAlarmMode = number_display_mode;
@@ -356,6 +356,7 @@ void loop() {
 				displayInitialised = true;
 			}
 			break;
+		}
 		case CurrentMode::settings:
 			if (!displayInitialised) {
 				settingsCarousel.resetCarousel();
