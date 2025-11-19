@@ -3,6 +3,7 @@
 
 #include "Display.h"
 #include "DS3231_Wrapper.h"
+#include "AlarmController.h"
 #include "Stopwatch.h"
 
 #include "Rotary.h"
@@ -24,6 +25,7 @@ Stopwatch stopwatch;
 Display* display = new Display(ROWS, COLUMNS, LED_PIN);
 ClockText* clockTextFormatter = new ClockText();
 PersistentSettings persistentSettings;
+AlarmController alarmController;
 
 enum class CurrentMode {
 	clock,
@@ -72,6 +74,7 @@ void setup() {
 	myRTC.setDstEnabled(persistentSettings.isDstEnabled());
 
 	stopwatch.init(myRTC);
+	alarmController.init(&myRTC);
 
 	initSettingsCarousel(display, clockTextFormatter, &persistentSettings, &myRTC);
 }
@@ -108,7 +111,13 @@ void loop() {
 		if (leavingSettings) {
 			persistentSettings.saveIfDirty();
 		}
+		if (current_mode == CurrentMode::alarm) {
+			alarmController.onExitMode();
+		}
 		current_mode = newMode;
+		if (current_mode == CurrentMode::alarm) {
+			alarmController.onEnterMode();
+		}
 		displayInitialised = false;
 	};
 	InputEvent event{};
@@ -127,7 +136,12 @@ void loop() {
 						switchMode(CurrentMode::timer);
 						break;
 					case InputKey::AuxButton3:
-						switchMode(CurrentMode::alarm);
+						if (current_mode == CurrentMode::alarm) {
+							alarmController.toggleCurrentAlarmActive();
+							displayInitialised = false;
+						} else {
+							switchMode(CurrentMode::alarm);
+						}
 						break;
 					case InputKey::AuxButton4:
 						switchMode(CurrentMode::settings);
@@ -136,12 +150,16 @@ void loop() {
 						break;
 				}
 				break;
-			case InputEventType::Pressed:
-				switch (event.key) {
+				case InputEventType::Pressed:
+					switch (event.key) {
 					case InputKey::RotaryCW:
 						if (current_mode == CurrentMode::settings) {
 							settingsCarousel.rotateOption(1);
-						} else if (event.type == InputEventType::Pressed) {
+						} else if (current_mode == CurrentMode::alarm && alarmController.isEditing()) {
+							if (alarmController.adjustCurrentAlarm(1)) {
+								displayInitialised = false;
+							}
+						} else {
 							display->incrementBrightness();
 							Serial.println("RotaryCW");
 						}
@@ -149,12 +167,21 @@ void loop() {
 					case InputKey::RotaryCCW:
 						if (current_mode == CurrentMode::settings) {
 							settingsCarousel.rotateOption(-1);
-						} else if (event.type == InputEventType::Pressed) {
+						} else if (current_mode == CurrentMode::alarm && alarmController.isEditing()) {
+							if (alarmController.adjustCurrentAlarm(-1)) {
+								displayInitialised = false;
+							}
+						} else {
 							display->decrementBrightness();
 							Serial.println("RotaryCCW");
 						}
 						break;
 					case InputKey::RotaryButton:
+						if (current_mode == CurrentMode::alarm) {
+							if (alarmController.handleRotaryButtonPress()) {
+								displayInitialised = false;
+							}
+						}
 						logButtonEvent("RotaryButton", event.type);
 						break;
 					case InputKey::AuxButton0:
@@ -181,8 +208,13 @@ void loop() {
 						break;
 					case InputKey::AuxButton2:
 						break;
-					case InputKey::AuxButton3:
-						break;
+				case InputKey::AuxButton3:
+					if (current_mode == CurrentMode::alarm) {
+						if (alarmController.selectNextAlarm()) {
+							displayInitialised = false;
+						}
+					}
+					break;
 					case InputKey::AuxButton4:
 						if (current_mode == CurrentMode::settings) {
 							settingsCarousel.nextItem();
@@ -191,6 +223,9 @@ void loop() {
 				}
 				break;
 			case InputEventType::Hold:
+				if (alarmController.dismissActiveAlarm()) {
+					break;
+				}
 				switch (event.key) {
 					case InputKey::AuxButton0:
 						break;
@@ -216,6 +251,8 @@ void loop() {
 				break;
 		}
 	}
+
+	alarmController.tick();
 
 	if (InputEventBuffer::consumeOverflowFlag()) {
 		Serial.println("Input queue overflow");
@@ -280,8 +317,42 @@ void loop() {
 			}
 			break;
 		case CurrentMode::alarm:
-			if (!displayInitialised) {
-				display->write_string("Alarm", CRGB::Purple, true);
+			static uint8_t displayedAlarmHours = 255;
+			static uint8_t displayedAlarmMinutes = 255;
+			static NumberDisplayMode displayedAlarmMode = number_display_mode;
+			static size_t displayedAlarmIndex = AlarmController::kAlarmCount;
+			static bool displayedAlarmEnabled = false;
+			static bool displayedAlarmRinging = false;
+
+			if (alarmController.consumeNeedsRedraw()) {
+				displayInitialised = false;
+			}
+
+			const uint8_t alarmHours = alarmController.currentHours();
+			const uint8_t alarmMinutes = alarmController.currentMinutes();
+			const size_t alarmIndex = alarmController.currentIndex();
+			const bool alarmEnabled = alarmController.isCurrentAlarmEnabled();
+			const bool alarmRinging = alarmController.isAlarmRinging();
+
+			const bool alarmTimeChanged = (alarmHours != displayedAlarmHours) || (alarmMinutes !=
+				displayedAlarmMinutes);
+			const bool alarmModeChanged = (number_display_mode != displayedAlarmMode);
+			const bool alarmIndexChanged = (alarmIndex != displayedAlarmIndex);
+			const bool alarmStatusChanged = (alarmEnabled != displayedAlarmEnabled) || (alarmRinging !=
+				displayedAlarmRinging);
+
+			if (!displayInitialised || alarmTimeChanged || alarmModeChanged || alarmIndexChanged ||
+				alarmStatusChanged) {
+				clockTextFormatter->prepareTimeString(alarmHours, alarmMinutes, number_display_mode, clock_text,
+				                                      clock_colors);
+				alarmController.applyStatusColors(clock_colors);
+				display->write_string(clock_text, clock_colors, true);
+				displayedAlarmHours = alarmHours;
+				displayedAlarmMinutes = alarmMinutes;
+				displayedAlarmMode = number_display_mode;
+				displayedAlarmIndex = alarmIndex;
+				displayedAlarmEnabled = alarmEnabled;
+				displayedAlarmRinging = alarmRinging;
 				displayInitialised = true;
 			}
 			break;
@@ -299,8 +370,8 @@ void loop() {
 	display->tick();
 	const uint32_t elapsed = millis() - startTime;
 	const uint32_t frameDelay = (elapsed < TARGET_DELAY_BETWEEN_FRAMES)
-		? (TARGET_DELAY_BETWEEN_FRAMES - elapsed)
-		: 1;
+		                            ? (TARGET_DELAY_BETWEEN_FRAMES - elapsed)
+		                            : 1;
 	delay(frameDelay);
 }
 
