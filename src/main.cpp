@@ -74,7 +74,7 @@ void setup() {
 	myRTC.setDstEnabled(persistentSettings.isDstEnabled());
 
 	stopwatch.init(myRTC);
-	alarmController.init(&myRTC);
+	alarmController.init(&myRTC, &persistentSettings);
 
 	initSettingsCarousel(display, clockTextFormatter, &persistentSettings, &myRTC);
 }

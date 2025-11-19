@@ -1,5 +1,6 @@
 #include "PersistentSettings.h"
 
+#include <algorithm>
 #include <cstring>
 
 void PersistentSettings::begin() {
@@ -63,6 +64,53 @@ void PersistentSettings::saveNow() {
 	saveIfDirty();
 }
 
+size_t PersistentSettings::loadAlarms(AlarmSetting* alarms, size_t maxAlarms) const {
+	if (!alarms) {
+		return 0;
+	}
+	const size_t limit = std::min(maxAlarms, kMaxStoredAlarms);
+	for (size_t i = 0; i < limit; ++i) {
+		const auto& stored = data_.alarms[i];
+		if (stored.hour == kUnusedAlarmHour) {
+			alarms[i] = AlarmSetting{};
+			continue;
+		}
+		alarms[i].hour = stored.hour;
+		alarms[i].minute = stored.minute;
+		alarms[i].active = stored.active != 0;
+		alarms[i].valid = true;
+	}
+	return limit;
+}
+
+void PersistentSettings::storeAlarms(const AlarmSetting* alarms, size_t count) {
+	if (!alarms) {
+		return;
+	}
+	const size_t limit = std::min(count, kMaxStoredAlarms);
+	bool changed = false;
+	for (size_t i = 0; i < kMaxStoredAlarms; ++i) {
+		SettingsBlob::AlarmRecord record{};
+		if (i < limit && alarms[i].valid) {
+			record.hour = alarms[i].hour;
+			record.minute = alarms[i].minute;
+			record.active = alarms[i].active ? 1 : 0;
+		} else {
+			record.hour = kUnusedAlarmHour;
+			record.minute = 0;
+			record.active = 0;
+		}
+		if (record.hour != data_.alarms[i].hour || record.minute != data_.alarms[i].minute ||
+		    record.active != data_.alarms[i].active) {
+			data_.alarms[i] = record;
+			changed = true;
+		}
+	}
+	if (changed) {
+		dirty_ = true;
+	}
+}
+
 PersistentSettings::SettingsBlob PersistentSettings::defaultSettings() {
 	SettingsBlob blob{};
 	blob.magic = kMagic;
@@ -71,6 +119,11 @@ PersistentSettings::SettingsBlob PersistentSettings::defaultSettings() {
 	blob.timezoneOffsetHours = 0;
 	blob.dstEnabled = 0;
 	memset(blob.reserved, 0, sizeof(blob.reserved));
+	for (auto& alarm : blob.alarms) {
+		alarm.hour = kUnusedAlarmHour;
+		alarm.minute = 0;
+		alarm.active = 0;
+	}
 	return blob;
 }
 

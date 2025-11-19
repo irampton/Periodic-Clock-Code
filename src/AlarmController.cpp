@@ -1,5 +1,8 @@
 #include "AlarmController.h"
 
+#include <algorithm>
+#include <array>
+
 namespace {
 constexpr int kHoursPerDay = 24;
 constexpr int kMinutesPerHour = 60;
@@ -7,9 +10,11 @@ constexpr int kMinutesPerDay = kHoursPerDay * kMinutesPerHour;
 constexpr int kAutoClearMinutes = 1;
 }
 
-void AlarmController::init(DS3231_Wrapper* rtc) {
-    rtc_ = rtc;
-    viewDirty_ = true;
+void AlarmController::init(DS3231_Wrapper* rtc, PersistentSettings* settings) {
+	rtc_ = rtc;
+	settings_ = settings;
+	loadFromStorage();
+	viewDirty_ = true;
 }
 
 void AlarmController::onEnterMode() {
@@ -17,7 +22,8 @@ void AlarmController::onEnterMode() {
 }
 
 void AlarmController::onExitMode() {
-    stopEditing();
+	saveToStorage();
+	stopEditing();
 }
 
 bool AlarmController::selectNextAlarm() {
@@ -293,6 +299,7 @@ void AlarmController::clearGuard(AlarmEntry& alarm) {
 
 void AlarmController::markModified(AlarmEntry& alarm) {
 	alarm.modified = true;
+	alarmsDirty_ = true;
 }
 
 size_t AlarmController::highestSelectableIndex() const {
@@ -312,4 +319,63 @@ size_t AlarmController::highestSelectableIndex() const {
 		limit = lastIndex;
 	}
 	return static_cast<size_t>(limit);
+}
+
+void AlarmController::loadFromStorage() {
+	for (auto& alarm : alarms_) {
+		alarm = AlarmEntry{};
+	}
+	alarmsDirty_ = false;
+	if (!settings_) {
+		return;
+	}
+	const size_t limit = std::min(kAlarmCount, PersistentSettings::kMaxStoredAlarms);
+	if (limit == 0) {
+		return;
+	}
+	std::array<PersistentSettings::AlarmSetting, PersistentSettings::kMaxStoredAlarms> stored{};
+	const size_t loaded = settings_->loadAlarms(stored.data(), limit);
+	for (size_t i = 0; i < limit; ++i) {
+		auto& alarm = alarms_[i];
+		if (i < loaded && stored[i].valid) {
+			alarm.hours = stored[i].hour;
+			alarm.minutes = stored[i].minute;
+			alarm.enabled = stored[i].active;
+			alarm.modified = true;
+		} else {
+			alarm = AlarmEntry{};
+		}
+		alarm.triggeredThisMinute = false;
+		alarm.guardMinuteOfDay = 0;
+	}
+}
+
+void AlarmController::saveToStorage() {
+	if (!settings_ || !alarmsDirty_) {
+		return;
+	}
+	const size_t limit = std::min(kAlarmCount, PersistentSettings::kMaxStoredAlarms);
+	if (limit == 0) {
+		alarmsDirty_ = false;
+		return;
+	}
+	std::array<PersistentSettings::AlarmSetting, PersistentSettings::kMaxStoredAlarms> snapshot{};
+	for (size_t i = 0; i < limit; ++i) {
+		auto& slot = snapshot[i];
+		const auto& alarm = alarms_[i];
+		if (alarm.modified) {
+			slot.hour = alarm.hours;
+			slot.minute = alarm.minutes;
+			slot.active = alarm.enabled;
+			slot.valid = true;
+		} else {
+			slot.hour = 0;
+			slot.minute = 0;
+			slot.active = false;
+			slot.valid = false;
+		}
+	}
+	settings_->storeAlarms(snapshot.data(), limit);
+	settings_->saveIfDirty();
+	alarmsDirty_ = false;
 }

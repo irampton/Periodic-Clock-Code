@@ -8,12 +8,13 @@
 
 #include "DS3231_Wrapper.h"
 #include "clockText.h"
+#include "PersistentSettings.h"
 
 class AlarmController {
 public:
     static constexpr size_t kAlarmCount = 8;
 
-    void init(DS3231_Wrapper* rtc);
+    void init(DS3231_Wrapper* rtc, PersistentSettings* settings);
     void onEnterMode();
     void onExitMode();
 
@@ -65,13 +66,17 @@ private:
     void clearGuard(AlarmEntry& alarm);
     void markModified(AlarmEntry& alarm);
     size_t highestSelectableIndex() const;
+    void loadFromStorage();
+    void saveToStorage();
 
     std::array<AlarmEntry, kAlarmCount> alarms_{};
     size_t currentIndex_ = 0;
     EditState editState_ = EditState::None;
     DS3231_Wrapper* rtc_ = nullptr;
+    PersistentSettings* settings_ = nullptr;
     bool viewDirty_ = false;
     bool alarmRinging_ = false;
     int8_t ringingAlarmIndex_ = -1;
     uint16_t ringingStartMinuteOfDay_ = 0;
-}; 
+    bool alarmsDirty_ = false;
+};

@@ -26,9 +26,21 @@ public:
 	// Force an immediate save (useful for rare operations, e.g. setting the time).
 	void saveNow();
 
+	struct AlarmSetting {
+		uint8_t hour = 0;
+		uint8_t minute = 0;
+		bool active = false;
+		bool valid = false;
+	};
+
+	static constexpr size_t kMaxStoredAlarms = 10;
+	size_t loadAlarms(AlarmSetting* alarms, size_t maxAlarms) const;
+	void storeAlarms(const AlarmSetting* alarms, size_t count);
+
 private:
 	static constexpr uint32_t kMagic = 0x70504344; // 'pPCD'
-	static constexpr uint16_t kVersion = 1;
+	static constexpr uint16_t kVersion = 2;
+	static constexpr uint8_t kUnusedAlarmHour = 0xFF;
 
 	// Pad this struct for future expansion; keep it packed for predictable layout.
 	struct __attribute__((packed)) SettingsBlob {
@@ -37,7 +49,13 @@ private:
 		uint8_t timeMode;
 		int8_t timezoneOffsetHours;
 		uint8_t dstEnabled;
-		uint8_t reserved[12];
+		uint8_t reserved[8];
+		struct __attribute__((packed)) AlarmRecord {
+			uint8_t hour;
+			uint8_t minute;
+			uint8_t active;
+		};
+		AlarmRecord alarms[kMaxStoredAlarms];
 	};
 
 	static constexpr size_t kStorageSize = sizeof(SettingsBlob);
