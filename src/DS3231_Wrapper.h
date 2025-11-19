@@ -14,12 +14,17 @@ public:
 		int minute;
 	};
 
-	HoursMinutes getCachedHoursMinutes(); // Cached hours/minutes fetcher
 	void printTime(); // Method to print current time
+
+	// Time getters
+	// Call getHours, getMinutes, getSeconds, and getEpoch sparingly. Do not put unrestricted in tick functions.
+	// Use getCachedHoursMinutes for most uses
 	int getHours(); // Getter for hours
 	int getMinutes(); // Getter for minutes
 	int getSeconds(); // Getter for seconds
 	uint32_t getEpoch(); // Getter for Unix time (seconds since 1970-01-01)
+	HoursMinutes getCachedHoursMinutes(); // Cached hours/minutes fetcher
+
 	void setTime(time_t epochSeconds, int8_t timezoneHourOffset, bool dstEnabled);
 	void setTimezoneOffset(int8_t timezoneHourOffset);
 	int8_t getTimezoneHourOffset() const;
