@@ -3,6 +3,8 @@
 #include <algorithm>
 #include <array>
 
+#include "Display.h"
+
 namespace {
 constexpr int kHoursPerDay = 24;
 constexpr int kMinutesPerHour = 60;
@@ -15,6 +17,13 @@ void AlarmController::init(DS3231_Wrapper* rtc, PersistentSettings* settings) {
 	settings_ = settings;
 	loadFromStorage();
 	viewDirty_ = true;
+}
+
+void AlarmController::setDisplay(Display* display) {
+	display_ = display;
+	if (display_) {
+		display_->strobe(alarmRinging_);
+	}
 }
 
 void AlarmController::onEnterMode() {
@@ -225,6 +234,9 @@ bool AlarmController::dismissActiveAlarm() {
 	alarmRinging_ = false;
 	ringingAlarmIndex_ = -1;
 	ringingStartMinuteOfDay_ = 0;
+	if (display_) {
+		display_->strobe(false);
+	}
 	markDirty();
 	return true;
 }
@@ -261,6 +273,9 @@ void AlarmController::startAlarm(size_t index, uint16_t currentMinuteOfDay) {
 	ringingStartMinuteOfDay_ = currentMinuteOfDay;
 	stopEditing();
 	markDirty();
+	if (display_) {
+		display_->strobe(true);
+	}
 	activateAlarm();
 }
 

@@ -10,11 +10,14 @@
 #include "clockText.h"
 #include "PersistentSettings.h"
 
+class Display;
+
 class AlarmController {
 public:
 	static constexpr size_t kAlarmCount = 8;
 
 	void init(DS3231_Wrapper* rtc, PersistentSettings* settings);
+	void setDisplay(Display* display);
 	void onEnterMode();
 	void onExitMode();
 
@@ -74,6 +77,7 @@ private:
 	EditState editState_ = EditState::None;
 	DS3231_Wrapper* rtc_ = nullptr;
 	PersistentSettings* settings_ = nullptr;
+	Display* display_ = nullptr;
 	bool viewDirty_ = false;
 	bool alarmRinging_ = false;
 	int8_t ringingAlarmIndex_ = -1;

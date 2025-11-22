@@ -75,6 +75,7 @@ void setup() {
 
 	stopwatch.init(myRTC);
 	alarmController.init(&myRTC, &persistentSettings);
+	alarmController.setDisplay(display);
 
 	initSettingsCarousel(display, clockTextFormatter, &persistentSettings, &myRTC);
 }
