@@ -21,6 +21,7 @@ public:
 	void incrementBrightness();
 	void decrementBrightness();
 	void strobe(bool enabled);
+	void blink(bool left, bool center, bool right);
 	void tick();
 
 private:
@@ -32,10 +33,17 @@ private:
 	uint32_t fadeStartMillis;
 	bool strobeActive;
 	uint32_t strobeStartMillis;
+	struct BlinkZoneState {
+		bool active;
+		uint32_t startMillis;
+	};
+	static constexpr int kBlinkZoneCount = 3;
+	BlinkZoneState blinkZones[kBlinkZoneCount];
 	LED_Wrapper driver;
 	std::vector<CRGB> displayedFrame;
 	std::vector<CRGB> targetFrame;
 	std::vector<CRGB> fadeFromFrame;
+	std::vector<int8_t> pixelZones;
 	std::vector<uint8_t> scrollColumns;
 	std::vector<CRGB> scrollColumnColors;
 	std::vector<CRGB> scrollBlendFrame;
@@ -43,8 +51,8 @@ private:
 	bool scrollActive;
 	uint32_t lastScrollUpdateMillis;
 	uint32_t scrollPauseUntilMillis;
-	void applyFrame(const std::vector<CRGB>& frame, float strobeMix);
-	void renderFadeFrame(float progress, float strobeMix);
+	void applyFrame(const std::vector<CRGB>& frame, float strobeMix, const float blinkMix[kBlinkZoneCount]);
+	void renderFadeFrame(float progress, float strobeMix, const float blinkMix[kBlinkZoneCount]);
 
 	struct GlyphColorEntry {
 		const Glyph* glyph;
@@ -70,4 +78,10 @@ private:
 	float strobeBlendAmount() const;
 	CRGB applyStrobeToColor(const CRGB& baseColor, float strobeMix) const;
 	bool isPixelLit(const CRGB& color) const;
+	void updatePixelZones();
+	void setBlinkZone(int zoneIndex, bool enabled);
+	void populateBlinkMixes(float (&mixes)[kBlinkZoneCount]) const;
+	float blinkBlendAmountForZone(int zoneIndex) const;
+	bool anyBlinkZoneActive() const;
+	CRGB applyBlinkToColor(const CRGB& baseColor, size_t pixelIndex, const float blinkMix[kBlinkZoneCount]) const;
 };

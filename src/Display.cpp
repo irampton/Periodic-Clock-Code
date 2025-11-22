@@ -12,8 +12,13 @@
 #define SCROLL_LOOP_DELAY_MULTIPLIER 15.0f
 #define SCROLL_WRAP_SPACER_COLUMNS 27
 #define STROBE_CYCLE_DURATION_MS 800
+#define BLINK_CYCLE_DURATION_MS 1200
 
 static constexpr float DISPLAY_TWO_PI = 6.28318530718f;
+static constexpr int kBlinkZoneLeft = 0;
+static constexpr int kBlinkZoneCenter = 1;
+static constexpr int kBlinkZoneRight = 2;
+static constexpr int8_t kBlinkZoneNone = -1;
 
 Display::Display(int rows, int cols, int led_pin)
 	: height(rows),
@@ -33,6 +38,14 @@ Display::Display(int rows, int cols, int led_pin)
 	displayedFrame.assign(totalPixels, CRGB::Black);
 	targetFrame = displayedFrame;
 	fadeFromFrame = displayedFrame;
+	pixelZones.assign(totalPixels, kBlinkZoneNone);
+	if (totalPixels > 0) {
+		updatePixelZones();
+	}
+	for (int zone = 0; zone < kBlinkZoneCount; ++zone) {
+		blinkZones[zone].active = false;
+		blinkZones[zone].startMillis = 0;
+	}
 }
 
 void Display::init() {
@@ -82,6 +95,11 @@ void Display::write_characters(char text[], CRGB* colors, bool fade) {
 
 void Display::tick() {
 	const float strobeMix = strobeBlendAmount();
+	float blinkMix[kBlinkZoneCount] = {1.0f, 1.0f, 1.0f};
+	const bool blinkAllowed = !strobeActive && anyBlinkZoneActive();
+	if (blinkAllowed) {
+		populateBlinkMixes(blinkMix);
+	}
 	if (fadeActive) {
 		const uint32_t elapsed = millis() - fadeStartMillis;
 		const float duration = static_cast<float>(std::max(FADE_DURATION_MS, 1));
@@ -89,7 +107,7 @@ void Display::tick() {
 		if (progress >= 1.0f) {
 			progress = 1.0f;
 		}
-		renderFadeFrame(progress, strobeMix);
+		renderFadeFrame(progress, strobeMix, blinkMix);
 		driver.renderLEDs();
 		if (progress >= 1.0f) {
 			fadeActive = false;
@@ -97,7 +115,7 @@ void Display::tick() {
 		}
 	} else if (scrollActive) {
 		displayedFrame = targetFrame;
-		applyFrame(displayedFrame, strobeMix);
+		applyFrame(displayedFrame, strobeMix, blinkMix);
 		driver.renderLEDs();
 		if (scrollColumns.empty()) {
 			disableScroll();
@@ -122,8 +140,8 @@ void Display::tick() {
 				}
 			}
 		}
-	} else if (newData || strobeActive) {
-		applyFrame(displayedFrame, strobeMix);
+	} else if (newData || strobeActive || blinkAllowed) {
+		applyFrame(displayedFrame, strobeMix, blinkMix);
 		driver.renderLEDs();
 		newData = false;
 	}
@@ -229,11 +247,18 @@ void Display::strobe(bool enabled) {
 	strobeStartMillis = 0;
 }
 
-void Display::applyFrame(const std::vector<CRGB>& frame, float strobeMix) {
+void Display::blink(bool left, bool center, bool right) {
+	setBlinkZone(kBlinkZoneLeft, left);
+	setBlinkZone(kBlinkZoneCenter, center);
+	setBlinkZone(kBlinkZoneRight, right);
+}
+
+void Display::applyFrame(const std::vector<CRGB>& frame, float strobeMix, const float blinkMix[kBlinkZoneCount]) {
 	const size_t totalPixels = static_cast<size_t>(height) * static_cast<size_t>(width);
 	const size_t copyCount = std::min(frame.size(), totalPixels);
 	for (size_t idx = 0; idx < copyCount; ++idx) {
-		const CRGB finalColor = applyStrobeToColor(frame[idx], strobeMix);
+		const CRGB blinked = applyBlinkToColor(frame[idx], idx, blinkMix);
+		const CRGB finalColor = applyStrobeToColor(blinked, strobeMix);
 		driver.preSetLED(static_cast<int>(idx), finalColor);
 	}
 }
@@ -251,14 +276,15 @@ static CRGB lerpColor(const CRGB& c1, const CRGB& c2, float per) {
 	            lerpComponent(c1.b, c2.b));
 }
 
-void Display::renderFadeFrame(float progress, float strobeMix) {
+void Display::renderFadeFrame(float progress, float strobeMix, const float blinkMix[kBlinkZoneCount]) {
 	size_t totalPixels = displayedFrame.size();
 	totalPixels = std::min(totalPixels, targetFrame.size());
 	totalPixels = std::min(totalPixels, fadeFromFrame.size());
 	for (size_t idx = 0; idx < totalPixels; ++idx) {
 		const CRGB blended = lerpColor(fadeFromFrame[idx], targetFrame[idx], progress);
 		displayedFrame[idx] = blended;
-		const CRGB finalColor = applyStrobeToColor(blended, strobeMix);
+		const CRGB blinked = applyBlinkToColor(blended, idx, blinkMix);
+		const CRGB finalColor = applyStrobeToColor(blinked, strobeMix);
 		driver.preSetLED(static_cast<int>(idx), finalColor);
 	}
 }
@@ -269,6 +295,7 @@ void Display::ensureFrameSize() {
 		displayedFrame.clear();
 		targetFrame.clear();
 		fadeFromFrame.clear();
+		pixelZones.clear();
 		return;
 	}
 
@@ -276,6 +303,9 @@ void Display::ensureFrameSize() {
 		displayedFrame.assign(totalPixels, CRGB::Black);
 		targetFrame = displayedFrame;
 		fadeFromFrame = displayedFrame;
+	}
+	if (pixelZones.size() != totalPixels) {
+		updatePixelZones();
 	}
 }
 
@@ -487,6 +517,137 @@ void Display::disableScroll() {
 	scrollBlendFrame.clear();
 	lastScrollUpdateMillis = 0;
 	scrollPauseUntilMillis = 0;
+}
+
+void Display::updatePixelZones() {
+	const size_t totalPixels = static_cast<size_t>(height) * static_cast<size_t>(width);
+	if (totalPixels == 0) {
+		pixelZones.clear();
+		return;
+	}
+
+	pixelZones.assign(totalPixels, kBlinkZoneNone);
+	const int columnCount = static_cast<int>(width);
+	if (columnCount <= 0 || height <= 0) {
+		return;
+	}
+
+	const int centerColumns = std::min(3, columnCount);
+	const int centerStart = std::max(0, (columnCount - centerColumns) / 2);
+	const int centerEnd = centerStart + centerColumns;
+	const int leftColumns = std::min(12, columnCount);
+	const int leftStart = std::max(0, columnCount - leftColumns);
+	const int rightColumns = std::min(12, columnCount);
+	const int totalSize = columnCount * height;
+
+	for (int col = 0; col < columnCount; ++col) {
+		const int visualColumn = columnCount - 1 - col;
+		int zone = kBlinkZoneNone;
+		if (visualColumn >= centerStart && visualColumn < centerEnd) {
+			zone = kBlinkZoneCenter;
+		} else if (visualColumn >= leftStart) {
+			zone = kBlinkZoneLeft;
+		} else if (visualColumn < rightColumns) {
+			zone = kBlinkZoneRight;
+		}
+
+		const bool reverse = ((columnCount - 1 - col) % 9) % 2 == 1;
+		const int colStart = totalSize - 1 - col * height;
+		for (int row = 0; row < height; ++row) {
+			const int ledIndex = reverse ? colStart - row : colStart - height + 1 + row;
+			if (ledIndex >= 0 && ledIndex < totalSize) {
+				pixelZones[static_cast<size_t>(ledIndex)] = static_cast<int8_t>(zone);
+			}
+		}
+	}
+}
+
+void Display::setBlinkZone(int zoneIndex, bool enabled) {
+	if (zoneIndex < 0 || zoneIndex >= kBlinkZoneCount) {
+		return;
+	}
+	BlinkZoneState& zone = blinkZones[zoneIndex];
+	if (enabled) {
+		if (!zone.active) {
+			zone.active = true;
+			zone.startMillis = millis();
+		}
+		return;
+	}
+
+	if (zone.active) {
+		zone.active = false;
+		zone.startMillis = 0;
+		newData = true;
+	}
+}
+
+void Display::populateBlinkMixes(float (&mixes)[kBlinkZoneCount]) const {
+	for (int zone = 0; zone < kBlinkZoneCount; ++zone) {
+		mixes[zone] = blinkBlendAmountForZone(zone);
+	}
+}
+
+float Display::blinkBlendAmountForZone(int zoneIndex) const {
+	if (zoneIndex < 0 || zoneIndex >= kBlinkZoneCount) {
+		return 1.0f;
+	}
+	const BlinkZoneState& zone = blinkZones[zoneIndex];
+	if (!zone.active) {
+		return 1.0f;
+	}
+	const uint32_t period = static_cast<uint32_t>(std::max(BLINK_CYCLE_DURATION_MS, 1));
+	if (period == 0) {
+		return 1.0f;
+	}
+	const uint32_t elapsed = millis() - zone.startMillis;
+	const uint32_t withinPeriod = elapsed % period;
+	const float normalized = static_cast<float>(withinPeriod) / static_cast<float>(period);
+	const float radians = normalized * DISPLAY_TWO_PI;
+	const float blend = 0.5f * (std::cos(radians) + 1.0f);
+	return std::clamp(blend, 0.0f, 1.0f);
+}
+
+bool Display::anyBlinkZoneActive() const {
+	for (int zone = 0; zone < kBlinkZoneCount; ++zone) {
+		if (blinkZones[zone].active) {
+			return true;
+		}
+	}
+	return false;
+}
+
+CRGB Display::applyBlinkToColor(const CRGB& baseColor,
+                                size_t pixelIndex,
+                                const float blinkMix[kBlinkZoneCount]) const {
+	if (strobeActive) {
+		return baseColor;
+	}
+	if (pixelIndex >= pixelZones.size()) {
+		return baseColor;
+	}
+	const int8_t zoneIndex = pixelZones[pixelIndex];
+	if (zoneIndex < 0 || zoneIndex >= kBlinkZoneCount) {
+		return baseColor;
+	}
+	const BlinkZoneState& zone = blinkZones[zoneIndex];
+	if (!zone.active || !isPixelLit(baseColor)) {
+		return baseColor;
+	}
+
+	const float scale = std::clamp(blinkMix[zoneIndex], 0.0f, 1.0f);
+	if (scale >= 0.999f) {
+		return baseColor;
+	}
+
+	const auto scaleComponent = [scale](uint8_t component) -> uint8_t
+	{
+		const float value = static_cast<float>(component) * scale;
+		return static_cast<uint8_t>(std::clamp(value, 0.0f, 255.0f));
+	};
+	return CRGB(scaleComponent(baseColor.r),
+	            scaleComponent(baseColor.g),
+	            scaleComponent(baseColor.b));
 }
 
 float Display::strobeBlendAmount() const {
