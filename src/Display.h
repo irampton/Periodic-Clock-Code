@@ -20,6 +20,7 @@ public:
 	void write_string(const std::string& text, const CRGB& color, bool fade = false);
 	void incrementBrightness();
 	void decrementBrightness();
+	void strobe(bool enabled);
 	void tick();
 
 private:
@@ -29,6 +30,8 @@ private:
 	bool newData;
 	bool fadeActive;
 	uint32_t fadeStartMillis;
+	bool strobeActive;
+	uint32_t strobeStartMillis;
 	LED_Wrapper driver;
 	std::vector<CRGB> displayedFrame;
 	std::vector<CRGB> targetFrame;
@@ -40,8 +43,8 @@ private:
 	bool scrollActive;
 	uint32_t lastScrollUpdateMillis;
 	uint32_t scrollPauseUntilMillis;
-	void applyFrame(const std::vector<CRGB>& frame);
-	void renderFadeFrame(float progress);
+	void applyFrame(const std::vector<CRGB>& frame, float strobeMix);
+	void renderFadeFrame(float progress, float strobeMix);
 
 	struct GlyphColorEntry {
 		const Glyph* glyph;
@@ -64,4 +67,7 @@ private:
 	bool advanceScrollPosition(float deltaSeconds);
 	uint32_t scrollPauseDurationMs() const;
 	void disableScroll();
+	float strobeBlendAmount() const;
+	CRGB applyStrobeToColor(const CRGB& baseColor, float strobeMix) const;
+	bool isPixelLit(const CRGB& color) const;
 };

@@ -11,6 +11,9 @@
 #define SCROLL_SPEED_PIXELS_PER_SECOND 20.0f
 #define SCROLL_LOOP_DELAY_MULTIPLIER 15.0f
 #define SCROLL_WRAP_SPACER_COLUMNS 27
+#define STROBE_CYCLE_DURATION_MS 800
+
+static constexpr float DISPLAY_TWO_PI = 6.28318530718f;
 
 Display::Display(int rows, int cols, int led_pin)
 	: height(rows),
@@ -19,6 +22,8 @@ Display::Display(int rows, int cols, int led_pin)
 	  newData(false),
 	  fadeActive(false),
 	  fadeStartMillis(0),
+	  strobeActive(false),
+	  strobeStartMillis(0),
 	  driver(led_pin, rows * cols),
 	  scrollPosition(0.0f),
 	  scrollActive(false),
@@ -37,6 +42,8 @@ void Display::init() {
 	newData = false;
 	fadeActive = false;
 	fadeStartMillis = 0;
+	strobeActive = false;
+	strobeStartMillis = 0;
 	disableScroll();
 }
 
@@ -74,6 +81,7 @@ void Display::write_characters(char text[], CRGB* colors, bool fade) {
 }
 
 void Display::tick() {
+	const float strobeMix = strobeBlendAmount();
 	if (fadeActive) {
 		const uint32_t elapsed = millis() - fadeStartMillis;
 		const float duration = static_cast<float>(std::max(FADE_DURATION_MS, 1));
@@ -81,7 +89,7 @@ void Display::tick() {
 		if (progress >= 1.0f) {
 			progress = 1.0f;
 		}
-		renderFadeFrame(progress);
+		renderFadeFrame(progress, strobeMix);
 		driver.renderLEDs();
 		if (progress >= 1.0f) {
 			fadeActive = false;
@@ -89,7 +97,7 @@ void Display::tick() {
 		}
 	} else if (scrollActive) {
 		displayedFrame = targetFrame;
-		applyFrame(displayedFrame);
+		applyFrame(displayedFrame, strobeMix);
 		driver.renderLEDs();
 		if (scrollColumns.empty()) {
 			disableScroll();
@@ -114,8 +122,8 @@ void Display::tick() {
 				}
 			}
 		}
-	} else if (newData) {
-		applyFrame(displayedFrame);
+	} else if (newData || strobeActive) {
+		applyFrame(displayedFrame, strobeMix);
 		driver.renderLEDs();
 		newData = false;
 	}
@@ -205,11 +213,28 @@ void Display::decrementBrightness() {
 	driver.setBrightness(brightness);
 }
 
-void Display::applyFrame(const std::vector<CRGB>& frame) {
+void Display::strobe(bool enabled) {
+	if (enabled) {
+		if (!strobeActive) {
+			strobeStartMillis = millis();
+		}
+		strobeActive = true;
+		return;
+	}
+
+	if (strobeActive) {
+		newData = true;
+	}
+	strobeActive = false;
+	strobeStartMillis = 0;
+}
+
+void Display::applyFrame(const std::vector<CRGB>& frame, float strobeMix) {
 	const size_t totalPixels = static_cast<size_t>(height) * static_cast<size_t>(width);
 	const size_t copyCount = std::min(frame.size(), totalPixels);
 	for (size_t idx = 0; idx < copyCount; ++idx) {
-		driver.preSetLED(static_cast<int>(idx), frame[idx]);
+		const CRGB finalColor = applyStrobeToColor(frame[idx], strobeMix);
+		driver.preSetLED(static_cast<int>(idx), finalColor);
 	}
 }
 
@@ -226,14 +251,15 @@ static CRGB lerpColor(const CRGB& c1, const CRGB& c2, float per) {
 	            lerpComponent(c1.b, c2.b));
 }
 
-void Display::renderFadeFrame(float progress) {
+void Display::renderFadeFrame(float progress, float strobeMix) {
 	size_t totalPixels = displayedFrame.size();
 	totalPixels = std::min(totalPixels, targetFrame.size());
 	totalPixels = std::min(totalPixels, fadeFromFrame.size());
 	for (size_t idx = 0; idx < totalPixels; ++idx) {
 		const CRGB blended = lerpColor(fadeFromFrame[idx], targetFrame[idx], progress);
 		displayedFrame[idx] = blended;
-		driver.preSetLED(static_cast<int>(idx), blended);
+		const CRGB finalColor = applyStrobeToColor(blended, strobeMix);
+		driver.preSetLED(static_cast<int>(idx), finalColor);
 	}
 }
 
@@ -461,4 +487,31 @@ void Display::disableScroll() {
 	scrollBlendFrame.clear();
 	lastScrollUpdateMillis = 0;
 	scrollPauseUntilMillis = 0;
+}
+
+float Display::strobeBlendAmount() const {
+	if (!strobeActive || STROBE_CYCLE_DURATION_MS <= 0) {
+		return 0.0f;
+	}
+
+	const uint32_t period = static_cast<uint32_t>(std::max(STROBE_CYCLE_DURATION_MS, 1));
+	const uint32_t elapsed = millis() - strobeStartMillis;
+	const uint32_t withinPeriod = elapsed % period;
+	const float normalized = static_cast<float>(withinPeriod) / static_cast<float>(period);
+	const float radians = normalized * DISPLAY_TWO_PI;
+	const float wave = 0.5f * (1.0f - std::cos(radians));
+	return std::clamp(wave, 0.0f, 1.0f);
+}
+
+CRGB Display::applyStrobeToColor(const CRGB& baseColor, float strobeMix) const {
+	if (!strobeActive) {
+		return baseColor;
+	}
+
+	const CRGB inverted = isPixelLit(baseColor) ? CRGB::Black : CRGB::White;
+	return lerpColor(baseColor, inverted, strobeMix);
+}
+
+bool Display::isPixelLit(const CRGB& color) const {
+	return color.r > 0 || color.g > 0 || color.b > 0;
 }
