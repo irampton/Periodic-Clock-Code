@@ -347,7 +347,7 @@ void loop() {
 				clockTextFormatter->prepareTimeString(alarmHours, alarmMinutes, number_display_mode, clock_text,
 				                                      clock_colors);
 				alarmController.applyStatusColors(clock_colors);
-				display->write_string(clock_text, clock_colors, true);
+				display->write_string(clock_text, clock_colors, false);
 				displayedAlarmHours = alarmHours;
 				displayedAlarmMinutes = alarmMinutes;
 				displayedAlarmMode = number_display_mode;
