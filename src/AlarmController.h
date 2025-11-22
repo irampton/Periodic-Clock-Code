@@ -63,6 +63,7 @@ private:
 	void stopEditing();
 	void startAlarm(size_t index, uint16_t currentMinuteOfDay);
 	void activateAlarm();
+	void updateBlinkState();
 	static uint16_t minuteOfDay(uint8_t hour, uint8_t minute);
 	static uint16_t minuteOfDay(const DS3231_Wrapper::HoursMinutes& time);
 	void refreshGuardForCurrentTime(uint16_t currentMinuteOfDay);

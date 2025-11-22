@@ -22,6 +22,7 @@ void AlarmController::init(DS3231_Wrapper* rtc, PersistentSettings* settings) {
 void AlarmController::setDisplay(Display* display) {
 	display_ = display;
 	if (display_) {
+		updateBlinkState();
 		display_->strobe(alarmRinging_);
 	}
 }
@@ -92,6 +93,7 @@ bool AlarmController::handleRotaryButtonPress() {
             editState_ = EditState::None;
             break;
     }
+	updateBlinkState();
     markDirty();
     return true;
 }
@@ -131,6 +133,7 @@ bool AlarmController::adjustCurrentAlarm(int delta) {
 		markModified(alarm);
 		clearGuard(alarm);
 	}
+	updateBlinkState();
 	markDirty();
 	return true;
 }
@@ -160,36 +163,39 @@ bool AlarmController::isAlarmRinging() const {
 }
 
 void AlarmController::applyStatusColors(CRGB* colors) const {
-    if (!colors) {
-        return;
-    }
+	if (!colors) {
+		return;
+	}
 
-    CRGB baseColor = CRGB::Blue;
-    if (alarmRinging_) {
-        baseColor = CRGB::Red;
-    } else if (currentAlarm().enabled) {
-        baseColor = CRGB::Green;
-    } else {
-        baseColor = CRGB::Purple;
-    }
+	auto softScale = [](const CRGB& color) -> CRGB {
+		const float factor = 0.7f;
+		const auto scaleComp = [factor](uint8_t component) -> uint8_t
+		{
+			return static_cast<uint8_t>(std::clamp(static_cast<int>(component * factor), 0, 255));
+		};
+		return CRGB(scaleComp(color.r), scaleComp(color.g), scaleComp(color.b));
+	};
 
-    for (uint8_t i = 0; i < CLOCK_LENGTH; ++i) {
-        if (i == 2) {
-            colors[i] = alarmRinging_ ? CRGB::White : CRGB::Gray;
-            continue;
-        }
-        colors[i] = baseColor;
-    }
+	CRGB baseColor = softScale(CRGB::Blue);
+	if (alarmRinging_) {
+		baseColor = CRGB::Red;
+	} else if (currentAlarm().enabled) {
+		baseColor = softScale(CRGB::Green);
+	} else {
+		baseColor = softScale(CRGB::Blue);
+	}
 
-    if (alarmRinging_) {
-        return;
-    }
+	for (uint8_t i = 0; i < CLOCK_LENGTH; ++i) {
+		if (i == 2) {
+			colors[i] = alarmRinging_ ? CRGB::White : CRGB::Gray;
+			continue;
+		}
+		colors[i] = baseColor;
+	}
 
-    if (editState_ == EditState::Hours && CLOCK_LENGTH >= 2) {
-        colors[0] = colors[1] = CRGB::Yellow;
-    } else if (editState_ == EditState::Minutes && CLOCK_LENGTH >= 4) {
-        colors[3] = colors[4] = CRGB::Orange;
-    }
+	if (alarmRinging_) {
+		return;
+	}
 }
 
 void AlarmController::tick() {
@@ -264,6 +270,7 @@ void AlarmController::markDirty() {
 void AlarmController::stopEditing() {
     if (editState_ != EditState::None) {
         editState_ = EditState::None;
+		updateBlinkState();
     }
 }
 
@@ -281,6 +288,15 @@ void AlarmController::startAlarm(size_t index, uint16_t currentMinuteOfDay) {
 
 void AlarmController::activateAlarm() {
 	// Placeholder for buzzer/LED activation logic.
+}
+
+void AlarmController::updateBlinkState() {
+	if (!display_) {
+		return;
+	}
+	const bool blinkHours = (editState_ == EditState::Hours);
+	const bool blinkMinutes = (editState_ == EditState::Minutes);
+	display_->blink(blinkHours, false, blinkMinutes);
 }
 
 uint16_t AlarmController::minuteOfDay(uint8_t hour, uint8_t minute) {
