@@ -70,37 +70,37 @@ inline CRGB get_color_by_number(int aNumber) {
 			switch (elementColumn[aNumber]) {
 				// 01:   Hydrogen
 				case 1:
-					return CRGB::Thistle;
+					return 0x9340DB;
 				// 02:   Alkali metals
 				case 2:
 					return CRGB::Yellow;
 				// 03:   Alkaline earth metals
 				case 3:
-					return CRGB::Purple;
+					return 0x220077;
 				// 04:   Boron family
 				case 4:
-					return CRGB::Teal;
+					return 0x00E0E0;
 				// 05:   Carbon family
 				case 5:
-					return CRGB::Navy;
+					return 0xA6FFDE;
 				// 06:   Nitrogen family
 				case 6:
-					return CRGB::Orange;
+					return 0xFF5511;
 				// 07:   Oxygen family
 				case 7:
-					return CRGB::Azure;
+					return 0x1616FF;
 				// 08:   Halogens
 				case 8:
-					return CRGB::Green;
+					return 0x16FF16;
 				// 09:   Noble gases
 				case 9:
-					return CRGB::Red;
+					return 0xFF1616;
 				// 10:   Transition metals
 				case 10:
-					return CRGB::Silver;
+					return 0xB0A0E0;
 				// 11:   Lanthanoids
 				case 11:
-					return CRGB::Brown;
+					return 0x8B512E;
 				// 12:   Actinoids
 				case 12:
 					return CRGB::Pink;
