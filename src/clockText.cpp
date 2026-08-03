@@ -29,7 +29,7 @@ void ClockText::setFixedColor(CRGB color) {
 
 CRGB ClockText::colorForDigit(char ch) {
 	uint8_t digit = static_cast<uint8_t>(ch - '0');
-	uint8_t hue = static_cast<uint8_t>(digit * 9);
+	uint8_t hue = static_cast<uint8_t>(digit * 22);
 	return CHSV(hue, kDigitSaturation, kDigitValue);
 }
 
