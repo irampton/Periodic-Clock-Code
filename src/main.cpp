@@ -1,10 +1,13 @@
 #include <Arduino.h>
 #include <Wire.h>
+#include <cstdio>
 
 #include "Display.h"
 #include "DS3231_Wrapper.h"
 #include "AlarmController.h"
+#include "OngoingAlarm.h"
 #include "Stopwatch.h"
+#include "TimerController.h"
 
 #include "Rotary.h"
 #include "serial.h"
@@ -22,10 +25,12 @@
 Rotary* r1 = new Rotary(9, 10, 8);
 DS3231_Wrapper myRTC;
 Stopwatch stopwatch;
+TimerController timerController;
 Display* display = new Display(ROWS, COLUMNS, LED_PIN);
 ClockText* clockTextFormatter = new ClockText();
 PersistentSettings persistentSettings;
 AlarmController alarmController;
+OngoingAlarm ongoingAlarm;
 
 enum class CurrentMode {
 	clock,
@@ -64,8 +69,6 @@ void setup() {
 	display->init();
 	InputEventBuffer::init();
 
-	pinMode(BUZZER_PIN, OUTPUT);
-
 	Serial.begin(9600);
 
 	persistentSettings.begin();
@@ -74,8 +77,10 @@ void setup() {
 	myRTC.setDstEnabled(persistentSettings.isDstEnabled());
 
 	stopwatch.init();
-	alarmController.init(&myRTC, &persistentSettings);
+	ongoingAlarm.init(display, BUZZER_PIN);
+	alarmController.init(&myRTC, &persistentSettings, &ongoingAlarm);
 	alarmController.setDisplay(display);
+	timerController.init(display, &ongoingAlarm);
 
 	initSettingsCarousel(display, clockTextFormatter, &persistentSettings, &myRTC);
 }
@@ -115,9 +120,15 @@ void loop() {
 		if (current_mode == CurrentMode::alarm) {
 			alarmController.onExitMode();
 		}
+		if (current_mode == CurrentMode::timer) {
+			timerController.onExitMode();
+		}
 		current_mode = newMode;
 		if (current_mode == CurrentMode::alarm) {
 			alarmController.onEnterMode();
+		}
+		if (current_mode == CurrentMode::timer) {
+			timerController.onEnterMode();
 		}
 		displayInitialised = false;
 	};
@@ -160,9 +171,11 @@ void loop() {
 							if (alarmController.adjustCurrentAlarm(1)) {
 								displayInitialised = false;
 							}
+						} else if (current_mode == CurrentMode::timer && timerController.isEditing()) {
+							if (timerController.adjustDuration(1)) displayInitialised = false;
 						} else {
 							display->incrementBrightness();
-							Serial.println("RotaryCW");
+							//Serial.println("RotaryCW");
 						}
 						break;
 					case InputKey::RotaryCCW:
@@ -172,9 +185,11 @@ void loop() {
 							if (alarmController.adjustCurrentAlarm(-1)) {
 								displayInitialised = false;
 							}
+						} else if (current_mode == CurrentMode::timer && timerController.isEditing()) {
+							if (timerController.adjustDuration(-1)) displayInitialised = false;
 						} else {
 							display->decrementBrightness();
-							Serial.println("RotaryCCW");
+							//Serial.println("RotaryCCW");
 						}
 						break;
 					case InputKey::RotaryButton:
@@ -182,6 +197,9 @@ void loop() {
 							if (alarmController.handleRotaryButtonPress()) {
 								displayInitialised = false;
 							}
+						}
+						if (current_mode == CurrentMode::timer && timerController.handleRotaryButtonPress()) {
+							displayInitialised = false;
 						}
 						logButtonEvent("RotaryButton", event.type);
 						break;
@@ -194,7 +212,7 @@ void loop() {
 								number_display_mode = NumberDisplayMode::Periodic;
 								break;
 						}
-						if (current_mode == CurrentMode::stopwatch) {
+						if (current_mode == CurrentMode::stopwatch || current_mode == CurrentMode::timer) {
 							displayInitialised = false;
 						}
 						break;
@@ -202,12 +220,17 @@ void loop() {
 						switch (current_mode) {
 							case CurrentMode::stopwatch:
 								stopwatch.toggle();
+								displayInitialised = false;
 								break;
 							default:
 								break;
 						}
 						break;
 					case InputKey::AuxButton2:
+						if (current_mode == CurrentMode::timer && !timerController.isEditing()) {
+							timerController.startOrPause();
+							displayInitialised = false;
+						}
 						break;
 					case InputKey::AuxButton3:
 						if (current_mode == CurrentMode::alarm) {
@@ -224,7 +247,10 @@ void loop() {
 				}
 				break;
 			case InputEventType::Hold:
-				if (alarmController.dismissActiveAlarm()) {
+				const bool dismissedAlarm = alarmController.dismissActiveAlarm();
+				const bool dismissedTimer = timerController.dismissCompletion();
+				if (dismissedAlarm || dismissedTimer) {
+					displayInitialised = false;
 					break;
 				}
 				switch (event.key) {
@@ -241,6 +267,10 @@ void loop() {
 						}
 						break;
 					case InputKey::AuxButton2:
+						if (current_mode == CurrentMode::timer && timerController.isPaused()) {
+							timerController.reset();
+							displayInitialised = false;
+						}
 						break;
 					case InputKey::AuxButton3:
 						break;
@@ -254,6 +284,8 @@ void loop() {
 	}
 
 	alarmController.tick();
+	timerController.tick();
+	ongoingAlarm.tick();
 
 	if (InputEventBuffer::consumeOverflowFlag()) {
 		Serial.println("Input queue overflow");
@@ -303,6 +335,7 @@ void loop() {
 
 			if (!displayInitialised || timeChanged || modeChanged) {
 				clockTextFormatter->prepareTimeString(displayHigh, displayLow, number_display_mode, clock_text, clock_colors);
+				clock_colors[2] = stopwatch.isRunning() ? CRGB::Green : CRGB::Red;
 				display->write_string(clock_text, clock_colors, true);
 				displayedHigh = displayHigh;
 				displayedLow = displayLow;
@@ -311,12 +344,28 @@ void loop() {
 			}
 			break;
 		}
-		case CurrentMode::timer:
-			if (!displayInitialised) {
-				display->write_string("Timer", CRGB::Green, true);
+		case CurrentMode::timer: {
+			static uint8_t displayedHigh = 255;
+			static uint8_t displayedLow = 255;
+			static bool displayedUsingHours = false;
+			if (timerController.consumeNeedsRedraw()) displayInitialised = false;
+			const uint8_t hours = timerController.displayHours();
+			const uint8_t minutes = timerController.displayMinutes();
+			const uint8_t seconds = timerController.displaySeconds();
+			const bool usingHours = timerController.shouldDisplayHours();
+			const uint8_t high = usingHours ? hours : minutes;
+			const uint8_t low = usingHours ? minutes : seconds;
+			if (!displayInitialised || high != displayedHigh || low != displayedLow || usingHours != displayedUsingHours) {
+				clockTextFormatter->prepareDurationString(high, low, number_display_mode, clock_text, clock_colors);
+				timerController.applyStatusColors(clock_colors);
+				display->write_string(clock_text, clock_colors, false);
+				displayedHigh = high;
+				displayedLow = low;
+				displayedUsingHours = usingHours;
 				displayInitialised = true;
 			}
 			break;
+		}
 		case CurrentMode::alarm: {
 			static uint8_t displayedAlarmHours = 255;
 			static uint8_t displayedAlarmMinutes = 255;

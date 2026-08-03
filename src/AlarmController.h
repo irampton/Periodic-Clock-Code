@@ -11,12 +11,13 @@
 #include "PersistentSettings.h"
 
 class Display;
+class OngoingAlarm;
 
 class AlarmController {
 public:
 	static constexpr size_t kAlarmCount = 8;
 
-	void init(DS3231_Wrapper* rtc, PersistentSettings* settings);
+	void init(DS3231_Wrapper* rtc, PersistentSettings* settings, OngoingAlarm* ongoingAlarm);
 	void setDisplay(Display* display);
 	void onEnterMode();
 	void onExitMode();
@@ -79,6 +80,7 @@ private:
 	DS3231_Wrapper* rtc_ = nullptr;
 	PersistentSettings* settings_ = nullptr;
 	Display* display_ = nullptr;
+	OngoingAlarm* ongoingAlarm_ = nullptr;
 	bool viewDirty_ = false;
 	bool alarmRinging_ = false;
 	int8_t ringingAlarmIndex_ = -1;

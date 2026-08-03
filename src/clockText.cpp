@@ -81,3 +81,18 @@ void ClockText::prepareTimeString(uint8_t hours, uint8_t minutes, NumberDisplayM
 			break;
 	}
 }
+
+void ClockText::prepareDurationString(uint8_t high, uint8_t low, NumberDisplayMode displayMode, std::string& text, CRGB* colors) const {
+	switch (displayMode) {
+		case NumberDisplayMode::Numeral: {
+			char buffer[6];
+			std::snprintf(buffer, sizeof(buffer), "%02u:%02u", high, low);
+			text.assign(buffer);
+			applyColors(text, colors);
+			break;
+		}
+		case NumberDisplayMode::Periodic:
+			convert_to_periodic_time(high, low, text, colors);
+			break;
+	}
+}

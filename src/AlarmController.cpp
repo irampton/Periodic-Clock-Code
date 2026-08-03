@@ -4,6 +4,7 @@
 #include <array>
 
 #include "Display.h"
+#include "OngoingAlarm.h"
 
 namespace {
 constexpr int kHoursPerDay = 24;
@@ -12,9 +13,10 @@ constexpr int kMinutesPerDay = kHoursPerDay * kMinutesPerHour;
 constexpr int kAutoClearMinutes = 1;
 }
 
-void AlarmController::init(DS3231_Wrapper* rtc, PersistentSettings* settings) {
+void AlarmController::init(DS3231_Wrapper* rtc, PersistentSettings* settings, OngoingAlarm* ongoingAlarm) {
 	rtc_ = rtc;
 	settings_ = settings;
+	ongoingAlarm_ = ongoingAlarm;
 	loadFromStorage();
 	viewDirty_ = true;
 }
@@ -23,7 +25,7 @@ void AlarmController::setDisplay(Display* display) {
 	display_ = display;
 	if (display_) {
 		updateBlinkState();
-		display_->strobe(alarmRinging_);
+		display_->strobe(ongoingAlarm_ && ongoingAlarm_->isActive());
 	}
 }
 
@@ -240,9 +242,7 @@ bool AlarmController::dismissActiveAlarm() {
 	alarmRinging_ = false;
 	ringingAlarmIndex_ = -1;
 	ringingStartMinuteOfDay_ = 0;
-	if (display_) {
-		display_->strobe(false);
-	}
+	if (ongoingAlarm_) ongoingAlarm_->dismiss(OngoingAlarm::Source::Alarm);
 	markDirty();
 	return true;
 }
@@ -280,9 +280,7 @@ void AlarmController::startAlarm(size_t index, uint16_t currentMinuteOfDay) {
 	ringingStartMinuteOfDay_ = currentMinuteOfDay;
 	stopEditing();
 	markDirty();
-	if (display_) {
-		display_->strobe(true);
-	}
+	if (ongoingAlarm_) ongoingAlarm_->activate(OngoingAlarm::Source::Alarm);
 	activateAlarm();
 }
 

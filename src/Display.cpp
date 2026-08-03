@@ -12,7 +12,10 @@
 #define SCROLL_LOOP_DELAY_MULTIPLIER 15.0f
 #define SCROLL_WRAP_SPACER_COLUMNS 27
 #define STROBE_CYCLE_DURATION_MS 800
-#define BLINK_CYCLE_DURATION_MS 1200
+#define BLINK_CYCLE_DURATION_MS 2500
+
+// Keep the selected edit field visible while it breathes, rather than fading it out entirely.
+#define BLINK_MINIMUM_BRIGHTNESS 0.10f
 
 static constexpr float DISPLAY_TWO_PI = 6.28318530718f;
 static constexpr int kBlinkZoneLeft = 0;
@@ -635,7 +638,8 @@ CRGB Display::applyBlinkToColor(const CRGB& baseColor,
 		return baseColor;
 	}
 
-	const float scale = std::clamp(blinkMix[zoneIndex], 0.0f, 1.0f);
+	const float mix = std::clamp(blinkMix[zoneIndex], 0.0f, 1.0f);
+	const float scale = BLINK_MINIMUM_BRIGHTNESS + (1.0f - BLINK_MINIMUM_BRIGHTNESS) * mix;
 	if (scale >= 0.999f) {
 		return baseColor;
 	}
