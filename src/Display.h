@@ -18,6 +18,8 @@ public:
 	void write_characters(char text[], CRGB* colors, bool fade = false);
 	void write_string(const std::string& text, CRGB* colors, bool fade = false);
 	void write_string(const std::string& text, const CRGB& color, bool fade = false);
+	// Draw a row-major, top-left-origin pixel buffer onto the physical LED matrix.
+	void write_pixels(const CRGB* pixels, size_t count);
 	void incrementBrightness();
 	void decrementBrightness();
 	void strobe(bool enabled);

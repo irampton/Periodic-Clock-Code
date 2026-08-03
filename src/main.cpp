@@ -8,6 +8,7 @@
 #include "OngoingAlarm.h"
 #include "Stopwatch.h"
 #include "TimerController.h"
+#include "SnakeGame.h"
 
 #include "Rotary.h"
 #include "serial.h"
@@ -31,6 +32,7 @@ ClockText* clockTextFormatter = new ClockText();
 PersistentSettings persistentSettings;
 AlarmController alarmController;
 OngoingAlarm ongoingAlarm;
+SnakeGame snakeGame;
 
 enum class CurrentMode {
 	clock,
@@ -38,6 +40,7 @@ enum class CurrentMode {
 	timer,
 	alarm,
 	settings,
+	snake,
 };
 
 NumberDisplayMode number_display_mode = NumberDisplayMode::Periodic;
@@ -81,6 +84,7 @@ void setup() {
 	alarmController.init(&myRTC, &persistentSettings, &ongoingAlarm);
 	alarmController.setDisplay(display);
 	timerController.init(display, &ongoingAlarm);
+	snakeGame.init(display, COLUMNS, ROWS);
 
 	initSettingsCarousel(display, clockTextFormatter, &persistentSettings, &myRTC);
 }
@@ -123,12 +127,18 @@ void loop() {
 		if (current_mode == CurrentMode::timer) {
 			timerController.onExitMode();
 		}
+		if (current_mode == CurrentMode::snake) {
+			snakeGame.stop();
+		}
 		current_mode = newMode;
 		if (current_mode == CurrentMode::alarm) {
 			alarmController.onEnterMode();
 		}
 		if (current_mode == CurrentMode::timer) {
 			timerController.onEnterMode();
+		}
+		if (current_mode == CurrentMode::snake) {
+			snakeGame.start();
 		}
 		displayInitialised = false;
 	};
@@ -163,6 +173,14 @@ void loop() {
 				}
 				break;
 			case InputEventType::Pressed:
+				if (current_mode == CurrentMode::snake) {
+					if (event.key == InputKey::RotaryCW) {
+						snakeGame.turnLeft();
+					} else if (event.key == InputKey::RotaryCCW) {
+						snakeGame.turnRight();
+					}
+					break;
+				}
 				switch (event.key) {
 					case InputKey::RotaryCW:
 						if (current_mode == CurrentMode::settings) {
@@ -244,9 +262,18 @@ void loop() {
 							settingsCarousel.nextItem();
 						}
 						break;
+					default:
+						break;
 				}
 				break;
 			case InputEventType::Hold:
+				if (event.key == InputKey::ModeSettingsCombo) {
+					switchMode(CurrentMode::snake);
+					break;
+				}
+				if (current_mode == CurrentMode::snake) {
+					break;
+				}
 				const bool dismissedAlarm = alarmController.dismissActiveAlarm();
 				const bool dismissedTimer = timerController.dismissCompletion();
 				if (dismissedAlarm || dismissedTimer) {
@@ -415,6 +442,10 @@ void loop() {
 				displayInitialised = true;
 			}
 			break;
+		case CurrentMode::snake:
+			snakeGame.tick();
+			displayInitialised = true;
+			break;
 	}
 
 	// Update the display @ up to 60 frames per second
@@ -452,6 +483,9 @@ void setup1() {
 // Polls for any button presses or rotary encoder movement
 void loop1() {
 	static ButtonState buttonStates[kButtonCount];
+	static bool comboTiming = false;
+	static bool comboEventSent = false;
+	static uint32_t comboStartMs = 0;
 	InputEventBuffer::service();
 
 	bool rotaryInput[3];
@@ -502,7 +536,37 @@ void loop1() {
 			state.debounceCounter = 0;
 		}
 
-		if (state.isPressed && !state.holdEventSent) {
+	}
+
+	const bool comboPressed = buttonStates[0].isPressed && buttonStates[4].isPressed;
+	if (comboPressed) {
+		if (!comboTiming) {
+			comboTiming = true;
+			comboEventSent = false;
+			comboStartMs = millis();
+		}
+		if (!comboEventSent && millis() - comboStartMs >= kHoldThresholdMs &&
+			InputEventBuffer::push(InputKey::ModeSettingsCombo, InputEventType::Hold)) {
+			comboEventSent = true;
+			// Consume both component holds and their pending clicks.
+			buttonStates[0].holdEventSent = true;
+			buttonStates[4].holdEventSent = true;
+			buttonStates[0].pendingSingleClick = false;
+			buttonStates[4].pendingSingleClick = false;
+		}
+	} else {
+		comboTiming = false;
+		comboEventSent = false;
+	}
+
+	for (size_t i = 0; i < kButtonCount; ++i) {
+		auto& state = buttonStates[i];
+		const uint8_t pin = kButtonPins[i];
+		const auto key = static_cast<InputKey>(
+			static_cast<uint8_t>(InputKey::AuxButton0) + static_cast<uint8_t>(i));
+
+		const bool isComboComponent = comboPressed && (i == 0 || i == 4);
+		if (state.isPressed && !state.holdEventSent && !isComboComponent) {
 			const uint32_t heldDuration = millis() - state.pressStartMs;
 			if (heldDuration >= kHoldThresholdMs) {
 				InputEventBuffer::push(key, InputEventType::Hold, pin);

@@ -222,6 +222,32 @@ void Display::write_string(const std::string& text, const CRGB& color, bool fade
 	write_string(text, colorBuffer.data(), fade);
 }
 
+void Display::write_pixels(const CRGB* pixels, size_t count) {
+	disableScroll();
+	ensureFrameSize();
+	if (pixels == nullptr || targetFrame.empty()) {
+		return;
+	}
+
+	std::fill(targetFrame.begin(), targetFrame.end(), CRGB::Black);
+	const size_t pixelCount = std::min(count, targetFrame.size());
+	for (size_t visualIndex = 0; visualIndex < pixelCount; ++visualIndex) {
+		const int x = static_cast<int>(visualIndex % width);
+		const int y = static_cast<int>(visualIndex / width);
+		const int physicalColumn = width - 1 - x;
+		const int columnEnd = static_cast<int>(targetFrame.size()) - 1 - physicalColumn * height;
+		const bool reversed = (x % 9) % 2 == 1;
+		const int ledIndex = reversed ? columnEnd - y : columnEnd - height + 1 + y;
+		if (ledIndex >= 0 && ledIndex < static_cast<int>(targetFrame.size())) {
+			targetFrame[static_cast<size_t>(ledIndex)] = pixels[visualIndex];
+		}
+	}
+
+	displayedFrame = targetFrame;
+	fadeActive = false;
+	newData = true;
+}
+
 void Display::incrementBrightness() {
 	const uint16_t updated = static_cast<uint16_t>(brightness) + BRIGHTNESS_STEP;
 	brightness = static_cast<uint8_t>(std::min<uint16_t>(updated, 255));

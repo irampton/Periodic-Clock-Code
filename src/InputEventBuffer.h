@@ -11,7 +11,8 @@ enum class InputKey : uint8_t {
 	AuxButton1,
 	AuxButton2,
 	AuxButton3,
-	AuxButton4
+	AuxButton4,
+	ModeSettingsCombo
 };
 
 enum class InputEventType : uint8_t {
