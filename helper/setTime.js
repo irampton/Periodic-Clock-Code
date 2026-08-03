@@ -51,14 +51,14 @@ function sendToAllPorts() {
                 // Give it some time to transmit / process if needed
                 await sleep(1000);
 
-                Serial.disconnect();
+                await Serial.disconnect();
                 console.log(`Disconnected from ${port.path}`);
             } catch (error) {
                 console.error(`Failed on serial port ${port.path}:`, error);
                 // Move on to the next port, no rethrow
                 try {
                     // Just in case a partial connection happened
-                    Serial.disconnect();
+                    await Serial.disconnect();
                 } catch (_) {
                     // ignore disconnect errors
                 }

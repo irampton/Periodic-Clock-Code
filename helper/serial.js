@@ -53,24 +53,33 @@ function stopScan() {
 }
 
 function connect( path ) {
-    return new Promise( ( resolve ) => {
+    return new Promise( ( resolve, reject ) => {
         stopScan();
-        port = new SerialPort( { path: path, baudRate: 14400, autoOpen: false, } );
-        port.on( 'open', function () {
+        const newPort = new SerialPort( { path: path, baudRate: 14400, autoOpen: false, } );
+        port = newPort;
+        newPort.on( 'open', function () {
             connected = true;
             resolve();
         } );
-        port.open( function ( err ) {
+        newPort.open( function ( err ) {
             if ( err ) {
-                console.error( 'Error opening port: ', err.message );
-                return false;
+                if ( port === newPort ) {
+                    port = null;
+                }
+                reject( err );
             }
         } )
-        parser = port.pipe( new ReadlineParser( { delimiter: '\r\n' } ) );
-        parser.on( 'data', onMessage );
-        port.on( 'close', () => {
-            port = null;
-            parser = null;
+        const newParser = newPort.pipe( new ReadlineParser( { delimiter: '\r\n' } ) );
+        parser = newParser;
+        newParser.on( 'data', onMessage );
+        newPort.on( 'close', () => {
+            // A previous port can finish closing after the next one has opened.
+            // Only clear the shared state when this is still the active port.
+            if ( port === newPort ) {
+                connected = false;
+                port = null;
+                parser = null;
+            }
             if ( typeof onClose === "function" ) {
                 onClose();
             }
@@ -83,6 +92,9 @@ function send( msg ) {
 
     try {
         //console.log( "sending: ", msg );
+        if ( !connected || !port || !port.isOpen ) {
+            throw new Error( 'Serial port is not connected' );
+        }
         port.write( msg );
         port.write( '\r\n' );
     } catch ( e ) {
@@ -102,5 +114,18 @@ function invoke( msg ) {
 }
 
 function disconnect(){
-    port.close();
+    const currentPort = port;
+    if ( !currentPort || !currentPort.isOpen ) {
+        return Promise.resolve();
+    }
+
+    return new Promise( ( resolve, reject ) => {
+        currentPort.close( err => {
+            if ( err ) {
+                reject( err );
+            } else {
+                resolve();
+            }
+        } );
+    } );
 }
