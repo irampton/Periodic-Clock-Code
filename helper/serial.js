@@ -55,7 +55,8 @@ function stopScan() {
 function connect( path ) {
     return new Promise( ( resolve, reject ) => {
         stopScan();
-        const newPort = new SerialPort( { path: path, baudRate: 14400, autoOpen: false, } );
+        // Must match Serial.begin(9600) in the Pico firmware.
+        const newPort = new SerialPort( { path: path, baudRate: 9600, autoOpen: false, } );
         port = newPort;
         newPort.on( 'open', function () {
             connected = true;

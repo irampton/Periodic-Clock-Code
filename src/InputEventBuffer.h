@@ -28,18 +28,23 @@ struct InputEvent {
 
 class InputEventBuffer {
 public:
+	// The RP2040 FIFO is initialized by the Arduino-Pico runtime before setup()/setup1().
 	static void init();
 	static bool push(InputKey key, InputEventType type, uint8_t value = 0);
 	static bool pop(InputEvent& event);
 	static bool isEmpty();
 	static bool consumeOverflowFlag();
+	// Call from the producer core to report a previously dropped event.
+	static void service();
 
 private:
-	static constexpr uint8_t kCapacity = 32;
-	static volatile uint8_t head;
-	static volatile uint8_t tail;
-	static volatile bool overflowed;
-	static InputEvent buffer[kCapacity];
+	static constexpr uint32_t kOverflowMarker = 0xFFFFFFFFu;
+	static bool producerOverflowed;
+	static bool consumerOverflowed;
+
+	static uint32_t pack(InputKey key, InputEventType type, uint8_t value);
+	static InputEvent unpack(uint32_t packed);
+	static bool flushOverflowMarker();
 };
 
 #endif // RP2040_INPUT_EVENT_BUFFER_H

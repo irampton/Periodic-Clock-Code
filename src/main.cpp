@@ -73,7 +73,7 @@ void setup() {
 	myRTC.setTimezoneOffset(persistentSettings.getTimezoneOffsetHours());
 	myRTC.setDstEnabled(persistentSettings.isDstEnabled());
 
-	stopwatch.init(myRTC);
+	stopwatch.init();
 	alarmController.init(&myRTC, &persistentSettings);
 	alarmController.setDisplay(display);
 
@@ -403,6 +403,7 @@ void setup1() {
 // Polls for any button presses or rotary encoder movement
 void loop1() {
 	static ButtonState buttonStates[kButtonCount];
+	InputEventBuffer::service();
 
 	bool rotaryInput[3];
 	r1->loop(rotaryInput);
