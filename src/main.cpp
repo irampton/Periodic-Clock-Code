@@ -103,7 +103,7 @@ void loop() {
 		const char incoming = static_cast<char>(Serial.read());
 		if (incoming == '\r' || incoming == '\n') {
 			if (serialBuffer.length() > 0) {
-				handleSerialCommand(serialBuffer, myRTC, persistentSettings);
+				handleSerialCommand(serialBuffer, myRTC, persistentSettings, *display);
 				serialBuffer = "";
 			}
 		} else if (serialBuffer.length() < 32) {

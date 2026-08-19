@@ -248,6 +248,15 @@ void Display::write_pixels(const CRGB* pixels, size_t count) {
 	newData = true;
 }
 
+void Display::setBrightness(uint8_t value) {
+	brightness = value;
+	driver.setBrightness(brightness);
+}
+
+uint8_t Display::getBrightness() const {
+	return brightness;
+}
+
 void Display::incrementBrightness() {
 	const uint16_t updated = static_cast<uint16_t>(brightness) + BRIGHTNESS_STEP;
 	brightness = static_cast<uint8_t>(std::min<uint16_t>(updated, 255));

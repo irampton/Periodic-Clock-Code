@@ -20,6 +20,8 @@ public:
 	void write_string(const std::string& text, const CRGB& color, bool fade = false);
 	// Draw a row-major, top-left-origin pixel buffer onto the physical LED matrix.
 	void write_pixels(const CRGB* pixels, size_t count);
+	void setBrightness(uint8_t value);
+	uint8_t getBrightness() const;
 	void incrementBrightness();
 	void decrementBrightness();
 	void strobe(bool enabled);

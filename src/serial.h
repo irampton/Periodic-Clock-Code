@@ -3,6 +3,7 @@
 #include <Arduino.h>
 #include <stdlib.h>
 
+#include "Display.h"
 #include "DS3231_Wrapper.h"
 #include "PersistentSettings.h"
 
@@ -15,7 +16,8 @@ inline bool parseLong(const String &value, long &out) {
 	return endPtr != nullptr && *endPtr == '\0';
 }
 
-inline void handleSerialCommand(const String &command, DS3231_Wrapper &myRTC, PersistentSettings &settings) {
+inline void handleSerialCommand(const String &command, DS3231_Wrapper &myRTC, PersistentSettings &settings,
+								Display &display) {
 	String trimmed = command;
 	trimmed.trim();
 	if (trimmed.length() == 0) {
@@ -24,6 +26,24 @@ inline void handleSerialCommand(const String &command, DS3231_Wrapper &myRTC, Pe
 
 	String lowered = trimmed;
 	lowered.toLowerCase();
+
+	if (lowered == "b" || lowered.startsWith("b ")) {
+		String valueToken = trimmed.substring(1);
+		valueToken.trim();
+
+		long percent = 0;
+		if (!parseLong(valueToken, percent) || percent < 0 || percent > 100) {
+			Serial.println("Invalid brightness; expected 'B <0-100>'");
+			return;
+		}
+
+		const uint8_t brightness = static_cast<uint8_t>((percent * 255L + 50L) / 100L);
+		display.setBrightness(brightness);
+		Serial.print("Brightness set to ");
+		Serial.print(percent);
+		Serial.println("%");
+		return;
+	}
 
 	if (!lowered.startsWith("set ")) {
 		return;
